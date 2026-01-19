@@ -1,0 +1,52 @@
+﻿<h3>Create Driver</h3>
+
+@using CapManagement.Shared.DtoModels.DriverDtoModels
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="CreateDriverDto" Data="@driver" Submit="@OnSubmit">
+    <ChildContent>
+        <RadzenFieldset Text="Driver Information">
+
+            <RadzenLabel Text="First Name" Component="DriverName" />
+            <RadzenTextBox @bind-Value="driver.DriverName" Name="DriverName" Placeholder="Enter first name" Style="width:100%" />
+
+            <RadzenLabel Text="Last Name" Component="LastName" />
+            <RadzenTextBox @bind-Value="driver.LastName" Name="LastName" Placeholder="Enter last name" Style="width:100%" />
+
+            <RadzenLabel Text="License Number" Component="LicenseNumber" />
+            <RadzenTextBox @bind-Value="driver.LicenseNumber" Name="LicenseNumber" Placeholder="Enter license number" Style="width:100%" />
+
+            <RadzenLabel Text="Phone Number" Component="PhoneNumber" />
+            <RadzenTextBox @bind-Value="driver.Phonenumber" Name="PhoneNumber" Placeholder="Enter phone number" Style="width:100%" />
+
+            <RadzenLabel Text="Date of Birth" Component="DateOfBirth" />
+            <RadzenDatePicker @bind-Value="driver.DateOfBirth" Name="DateOfBirth" DateFormat="yyyy-MM-dd" Style="width:100%" />
+
+            <div class="rz-mt-3">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" Type="Submit" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(args => DialogService.Close(false))" />
+            </div>
+        </RadzenFieldset>
+    </ChildContent>
+</RadzenTemplateForm>
+
+@code {
+
+
+
+    [Parameter] public EventCallback<CreateDriverDto> OnDriverCreated { get; set; }
+
+    private CreateDriverDto driver = new();
+    // temporary hardcoded companyId
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+    private async Task OnSubmit()
+    {
+
+        // attach companyId before sending to parent
+        driver.CompanyId = _companyId;
+        await OnDriverCreated.InvokeAsync(driver);
+        DialogService.Close(true);
+    }
+}

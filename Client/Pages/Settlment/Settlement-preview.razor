@@ -1,0 +1,368 @@
+﻿@page "/settlement-preview"
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Client.ServiceClient
+@using CapManagement.Shared.DtoModels.EarningDtoModels
+@using CapManagement.Shared.DtoModels.SettlementDtoModels
+@using Microsoft.AspNetCore.WebUtilities  @* For QueryHelpers *@
+@inject NavigationManager NavigationManager
+@inject Microsoft.AspNetCore.Components.NavigationManager Nav
+@using System.Text.Json
+@using Radzen
+@using Radzen.Blazor
+@inject LocalStorageService LocalStorageService
+@inject DialogService DialogService
+
+
+<h3>Settlement Preview</h3>
+<RadzenCard class="p-4 mt-3 shadow-md">
+    <RadzenHeading Size="H5" Text="Earnings Summary" />
+    <RadzenDataGrid Data="@earnings" TItem="CreateEarningDto" ShowPagingSummary="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="Platform" Title="Platform" />
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="GrossIncome" Title="Gross (€)">
+                <FooterTemplate>
+                    Total: @earnings.Sum(e => e.GrossIncome).ToString("C")
+                </FooterTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="BtwPercentage" Title="BTW (%)">
+                <FooterTemplate>
+                    Total: @earnings.Sum(e => e.BtwPercentage).ToString("F1")%
+                </FooterTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="BtwAmount" Title="BTW (€)">
+                <FooterTemplate>
+                    Total: @earnings.Sum(e => e.BtwAmount).ToString("C")
+                </FooterTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="NetIncome" Title="Net (€)">
+                <FooterTemplate>
+                    Total: @earnings.Sum(e => e.NetIncome).ToString("C")
+                </FooterTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="WeekStart" Title="Week Start" FormatString="{0:yyyy-MM-dd}" />
+            <RadzenDataGridColumn TItem="CreateEarningDto" Property="WeekEnd" Title="Week End" FormatString="{0:yyyy-MM-dd}" />
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+<RadzenCard class="p-4 mt-4 shadow-md">
+    <RadzenHeading Size="H5" Text="Settlement Totals" />
+    <RadzenRow>
+        <RadzenColumn Size="6">
+            <InputNumber @bind-Value="extraCosts" @oninput="RecalculateTotals" />  @* Use @oninput for live updates; bind handles value *@
+        </RadzenColumn>
+        <RadzenColumn Size="6">
+            <RadzenLabel Text="Description" />
+            <RadzenTextBox @bind-Value="description" Style="width:100%" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <!-- New: Dedicated row for rent checkbox -->
+    <RadzenRow class="mt-3">
+        <RadzenColumn Size="12">
+            <RadzenCheckBox @bind-Value="applyRentDeduction" Style="margin-right: 1rem;">
+                Apply Rent Deduction (€1,000)
+            </RadzenCheckBox>
+            <RadzenLabel Text="Total Weekly Commission" />
+        </RadzenColumn>
+    </RadzenRow>
+
+
+
+    <RadzenRow class="mt-3">
+
+        <RadzenColumn Size="12">
+            <b>Overall Period:</b> @overallPeriodStart.ToString("yyyy-MM-dd") to @overallPeriodEnd.ToString("yyyy-MM-dd")
+        </RadzenColumn>
+
+
+        <RadzenColumn Size="4"><b>Total Gross:</b> @grossAmount.ToString("C")</RadzenColumn>
+        <!-- New: Checkbox for rent deduction -->
+        <!-- Simplified: @bind-Value auto-handles toggle + recalc -->
+
+        <RadzenColumn Size="4"><b>Rent Deduction:</b> @(applyRentDeduction ? rentDeduction.ToString("C") : "€0")</RadzenColumn>
+        <RadzenColumn Size="4"><b>Net Payout:</b> @netPayout.ToString("C")</RadzenColumn>
+    </RadzenRow>
+    <RadzenButton Text="Submit (Simulated)" Icon="check_circle" Style="margin-top:20px" Click="OnSubmit" />
+</RadzenCard>
+
+@code {
+    private List<CreateEarningDto> earnings = new();
+    private decimal grossAmount;
+    private decimal rentDeduction;
+    private decimal netPayout;
+    private decimal extraCosts;
+    private string description = "";
+    private DateTime overallPeriodStart = DateTime.MaxValue;
+    private DateTime overallPeriodEnd = DateTime.MinValue;
+    [Inject] ISettlmentClientService SettlementServiceClient { get; set; } = default!;  
+
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+    [Inject] NotificationService NotificationService { get; set; } = default!;
+    private bool applyRentDeduction
+    {
+        get => _applyRentDeduction;
+        set
+        {
+            if (_applyRentDeduction != value)
+            {
+                _applyRentDeduction = value;
+                RecalculateTotals(extraCosts);  // Auto-recalc on toggle
+            }
+        }
+    }
+    private bool _applyRentDeduction = true;  // Backing field (default true)
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "earnings")]
+    public string? EarningsJson { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "key")]
+    public string? Key { get; set; }
+
+
+
+
+
+
+    protected override async Task OnInitializedAsync()  @* Changed to async *@
+    {
+        await LoadEarningsAsync();  @* Await the load *@
+        Console.WriteLine($"Loaded {earnings.Count} earnings");  @* Debug log *@
+
+        if (earnings.Any())
+        {
+
+            // Compute overall period from earnings dates
+            overallPeriodStart = earnings.Min(e => e.WeekStart);
+            overallPeriodEnd = earnings.Max(e => e.WeekEnd);
+            RecalculateTotals(0m);
+        }
+        else
+        {
+            // Temp: Comment for testing—no redirect
+            // NavigationManager.NavigateTo("/create-earning");
+            Console.WriteLine("No earnings—showing empty preview for debug");  @* Debug *@
+        }
+    }
+
+    private async Task LoadEarningsAsync()
+    {
+        try
+        {
+            // Get all keys from storage
+            var allKeys = await LocalStorageService.GetAllKeysAsync();
+            Console.WriteLine($"Found {allKeys.Length} total keys");  @* Debug *@
+
+            // Filter for earnings_preview_* keys (exclude TTLs)
+            var previewKeys = allKeys
+                .Where(k => k.StartsWith("earnings_preview_") && !k.EndsWith("_ttl"))
+                .ToList();
+
+            Console.WriteLine($"Found {previewKeys.Count} preview keys");  @* Debug *@
+
+            if (!previewKeys.Any())
+            {
+                earnings = new List<CreateEarningDto>();
+                return;
+            }
+
+            // Async sorting: Fetch TTLs in parallel
+            var keyTasks = previewKeys.Select(async k =>
+            {
+                var ttlKey = $"{k}_ttl";
+                var ttlStr = await LocalStorageService.GetItemAsync(ttlKey);
+                var ttlDate = DateTime.TryParse(ttlStr, out var d) ? d : DateTime.MinValue;
+                return new { Key = k, Ttl = ttlDate };
+            });
+
+            var keyInfos = await Task.WhenAll(keyTasks);
+
+            // Find the most recent non-expired key
+            var latestKey = keyInfos
+                .Where(x => x.Ttl > DateTime.UtcNow.AddDays(-7))  @* Extended to 7 days for testing; adjust TTL in sender *@
+            .OrderByDescending(x => x.Ttl)
+            .FirstOrDefault()?.Key;
+
+            Console.WriteLine($"Selected latest key: {latestKey}");  @* Debug *@
+
+            if (string.IsNullOrEmpty(latestKey))
+            {
+                // All expired—clean up old ones
+                foreach (var key in previewKeys)
+                {
+                    await LocalStorageService.RemoveItemAsync(key);
+                    await LocalStorageService.RemoveItemAsync($"{key}_ttl");
+                }
+                earnings = new List<CreateEarningDto>();
+                return;
+            }
+
+            // Load from latest key
+            earnings = await LocalStorageService.GetItemAsync<List<CreateEarningDto>>(latestKey) ?? new List<CreateEarningDto>();
+
+            // Cleanup this session
+            await LocalStorageService.RemoveItemAsync(latestKey);
+            await LocalStorageService.RemoveItemAsync($"{latestKey}_ttl");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Load failed: {ex.Message}");
+            earnings = new List<CreateEarningDto>();
+        }
+
+        // Fallback to query param if still empty
+        if (!earnings.Any())
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("earnings", out var earningsValue))
+            {
+                var encodedJson = earningsValue.FirstOrDefault();
+                if (!string.IsNullOrEmpty(encodedJson))
+                {
+                    var json = Uri.UnescapeDataString(encodedJson);
+                    earnings = JsonSerializer.Deserialize<List<CreateEarningDto>>(json) ?? new List<CreateEarningDto>();
+                    Console.WriteLine($"Fallback loaded {earnings.Count} from query");  @* Debug *@
+                }
+            }
+        }
+    }
+
+    // Primary method: Handles direct decimal calls (e.g., from OnInitialized)
+    // private void RecalculateTotals(decimal value)
+    // {
+    //     extraCosts = value;
+    //     grossAmount = earnings.Sum(e => e.NetIncome);
+    //     rentDeduction = 250m * 4; // example
+
+    //     if (applyRentDeduction)
+    //     {
+    //         netPayout -= rentDeduction;
+    //     }
+
+    //     netPayout = grossAmount - rentDeduction - extraCosts;
+    //     if (netPayout < 0)
+    //         netPayout = 0;
+    //     StateHasChanged();
+    // }
+    private void RecalculateTotals(decimal value)
+    {
+        extraCosts = value;
+        grossAmount = earnings.Sum(e => e.NetIncome);
+        rentDeduction = 250m * 4; // example
+
+        // Base payout: Gross - Extra (always)
+        netPayout = grossAmount - extraCosts;
+
+        // OPTIONAL: Subtract rent only if checked
+        if (applyRentDeduction)
+        {
+            netPayout -= rentDeduction;
+        }
+
+        if (netPayout < 0)
+            netPayout = 0;
+        StateHasChanged();
+    }
+    // Event handler overload: Parses from ChangeEventArgs and delegates
+    private void RecalculateTotals(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out decimal value))
+        {
+            RecalculateTotals(value);  @* Delegate to primary *@
+        }
+        else
+        {
+            RecalculateTotals(0m);  @* Fallback *@
+        }
+    }
+
+    private async Task OnSubmit()  // Async for API call
+    {
+        if (!earnings.Any())
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "No Data",
+                    Detail = "Add earnings before submitting settlement.",
+                    Duration = 3000
+                });
+            return;
+        }
+
+        // HARDCODED CompanyId (for dev; make dynamic in prod via user context)
+        var companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+        // Optional: Override from earnings if available (for future-proofing)
+        // var companyId = earnings.FirstOrDefault(e => e.CompanyId != Guid.Empty)?.CompanyId ?? companyId;
+
+        var dto = new CreateSettlementDto
+            {
+                CompanyId = companyId,  // Hardcoded (dynamic fallback optional)
+                ContractId = earnings.First().ContractId,
+                PeriodStart = overallPeriodStart,
+                PeriodEnd = overallPeriodEnd,
+                Earnings = earnings,  // Pass ALL (new/existing)—backend creates new, links all
+                ExtraCosts = extraCosts,
+                Description = description,
+                GrossAmount = grossAmount,  // Optional pre-calc (backend overrides)
+                RentDeduction = applyRentDeduction ? rentDeduction : 0m,
+                NetPayout = netPayout
+            };
+
+        try
+        {
+            Console.WriteLine($"Submitting settlement: Gross {grossAmount:C}, Rent {rentDeduction:C}, Net {netPayout:C}");  // Debug
+
+            // Backend creates new earnings + settlement atomically (links all)
+            var response = await SettlementServiceClient.CreateSettlementAsync(dto);
+
+            if (response.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = $"Settlement {response.Data.SettlementId} created with {earnings.Count} earnings (new ones auto-saved)!",
+                        Duration = 4000
+                    });
+
+                // Clear local data and navigate
+                await LocalStorageService.ClearAsync();  // Clean up preview
+                NavigationManager.NavigateTo($"/settlements?contractId={dto.ContractId}");  // Or reset to create
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = response.Message ?? "Failed to create settlement.",
+                        Duration = 5000
+                    });
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Network Error",
+                    Detail = "Unable to connect to server. Check your connection.",
+                    Duration = 5000
+                });
+            Console.WriteLine($"API call failed: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Unexpected Error",
+                    Detail = "Something went wrong. Please try again.",
+                    Duration = 5000
+                });
+            Console.WriteLine($"Unexpected error: {ex.Message}");
+        }
+    }
+}

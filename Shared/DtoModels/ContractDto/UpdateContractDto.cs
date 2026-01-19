@@ -1,0 +1,55 @@
+﻿using CapManagement.Shared.Models;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+namespace CapManagement.Shared.DtoModels.ContractDto
+{
+    public class UpdateContractDto
+    {
+        [Required]
+        [JsonPropertyName("contractId")]
+        public Guid ContractId { get; set; }
+
+        [Required]
+        [JsonPropertyName("companyId")]
+        public Guid CompanyId { get; set; }
+
+        [Required]
+        [JsonPropertyName("driverId")]
+        public Guid DriverId { get; set; }
+
+        [Required]
+        [JsonPropertyName("carId")]
+        public Guid CarId { get; set; }
+
+        [Required]
+        [JsonPropertyName("startDate")]
+        public DateTime StartDate { get; set; }
+
+        [JsonPropertyName("endDate")]
+        public DateTime? EndDate { get; set; }
+
+        [Required]
+        [JsonPropertyName("status")]
+        public ContractStatus Status { get; set; }
+
+        [JsonPropertyName("paymentAmount")]
+        public decimal PaymentAmount { get; set; }
+
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required]
+        [JsonPropertyName("conditions")]
+        public string Conditions { get; set; } = string.Empty;
+
+        // Optional: PDF re-upload
+        [JsonPropertyName("pdfContent")]
+        public byte[]? PdfContent { get; set; }
+    }
+}

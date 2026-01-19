@@ -1,0 +1,183 @@
+﻿@page "/companies"
+@inject ICompanyServiceClient CompanyClientService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CompanyDtoModels
+@inject DialogService DialogService
+
+@using CapManagement.Client.ServiceClient
+
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+
+
+
+<RadzenButton Text="Add Company" Icon="add_circle" ButtonStyle="ButtonStyle.Primary"
+              Click="@(async args => await OpenCreateDialog())" Style="margin-top:20px" />
+
+
+<RadzenDataGrid TItem="CompanyDto" Data="@companies" Count="@totalCount" LoadData="@LoadData" AllowPaging="true" PageSize="10" AllowSorting="true" ColumnWidth="200px" Responsive="true">
+    <Columns>
+        <RadzenDataGridColumn TItem="CompanyDto" Property="CompanyName" Title="Name" />
+        <RadzenDataGridColumn TItem="CompanyDto" Property="VATNumber" Title="VAT Number" />
+        <RadzenDataGridColumn TItem="CompanyDto" Property="Address" Title="Address" />
+        <RadzenDataGridColumn TItem="CompanyDto" Property="CompanyEmail" Title="Address" />
+        <RadzenDataGridColumn TItem="CompanyDto" Property="CreatedAt" Title="Created" FormatString="{0:yyyy-MM-dd}" />
+        <RadzenDataGridColumn TItem="CompanyDto" Property="IsActive" Title="Status" />
+        <RadzenDataGridColumn TItem="CompanyDto" Title="Actions">
+
+
+            <Template Context="company">
+
+
+                <RadzenButton Text="View" Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                              Click="@(args => DialogService.OpenAsync<ViewCompanyDialog>(
+                          "Company Details",
+                          new Dictionary<string, object>() { { "CompanyId", company.CompanyId } },
+                          new DialogOptions() { Width = "600px", Height = "400px" }))" />
+
+
+                @if (company.IsActive)
+                {
+                    <RadzenButton Text="Archive" Icon="archive" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="@(() => Archive(company.CompanyId))" />
+                }
+                else
+                {
+                    <RadzenButton Text="Restore" Icon="refresh" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@(() => Restore(company.CompanyId))" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+
+
+@code {
+    private IEnumerable<CompanyDto> companies = new List<CompanyDto>();
+    private int totalCount;
+    private CreateCompanyDto newCompany = new();
+    private bool showDialog = false;
+    private int pageNumber;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadData(new LoadDataArgs { Skip = 0, Top = 10 }); // Initial load
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error on initialization: {ex.Message}");
+        }
+    }
+
+  
+
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        try
+        {
+            if (args.Skip.HasValue && args.Top.HasValue && args.Top.Value > 0)
+            {
+                pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+            }
+            else
+            {
+                pageNumber = 1;
+            }
+            int pageSize = args.Top ?? 10;
+            Console.WriteLine($"Loading data: PageNumber={pageNumber}, PageSize={pageSize}");
+            var result = await CompanyClientService.GetCompaniesAsync(pageNumber, pageSize);
+            if (result != null && result.Success)
+            {
+                companies = result.Data?.Data ?? new List<CompanyDto>();
+                totalCount = result.Data?.TotalItems ?? 0;
+                Console.WriteLine($"Loaded {companies.Count()} companies: {System.Text.Json.JsonSerializer.Serialize(companies)}");
+
+                StateHasChanged();
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Result is null" };
+                Console.WriteLine($"Failed to load data: {JsonSerializer.Serialize(errors)}");
+             
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}, StackTrace: {ex.StackTrace}");
+           
+        }
+    }
+
+    
+
+
+    // private async Task CreateCompany()
+    // {
+    //     var result = await CompanyClientService.CreateCompanyAsync(newCompany, Guid.NewGuid().ToString());
+    //     if (result != null && result.Success)
+    //     {
+    //         showDialog = false;
+    //         newCompany = new();
+    //         await LoadData(new LoadDataArgs { Skip = 0, Top = 10 });
+    //     }
+    //     else
+    //     {
+    //         Console.WriteLine("Create company failed");
+    //     }
+    // }
+
+    private async Task OpenCreateDialog()
+    {
+        var result = await DialogService.OpenAsync<CreateCompanyDialog>(
+            "Create Company",
+            new Dictionary<string, object>
+                {
+                { "OnCompanyCreated", EventCallback.Factory.Create<CreateCompanyDto>(this, CreateCompany) }
+                },
+            new DialogOptions() { Width = "600px", Height = "400px", Resizable = true, Draggable = true });
+
+        if (result == true)
+        {
+            await LoadData(new LoadDataArgs { Skip = 0, Top = 10 });
+        }
+    }
+
+    private async Task CreateCompany(CreateCompanyDto newCompany)
+    {
+        var result = await CompanyClientService.CreateCompanyAsync(newCompany, Guid.NewGuid().ToString());
+        if (result != null && result.Success)
+        {
+            Console.WriteLine("Company created successfully!");
+        }
+        else
+        {
+            Console.WriteLine("Create company failed");
+        }
+    }
+
+    private async Task Archive(Guid id)
+    {
+        var result = await CompanyClientService.ArchiveCompanyAsync(id);
+        if (result != null && result.Success)
+            await LoadData(new LoadDataArgs { Skip = 0, Top = 10 });
+        else
+            Console.WriteLine("Archive failed");
+    }
+
+
+
+
+    private async Task Restore(Guid id)
+    {
+        var result = await CompanyClientService.RestoreCompanyAsync(id);
+        if (result != null && result.Success)
+            await LoadData(new LoadDataArgs { Skip = 0, Top = 10 });
+        else
+            Console.WriteLine("Restore failed");
+    }
+}
+
+    

@@ -1,0 +1,81 @@
+﻿@using CapManagement.Client.ServiceClient.UserService
+@using Microsoft.AspNetCore.Components.Authorization
+@using Radzen
+@using Radzen.Blazor
+@* @inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+ *@
+ @using Radzen
+@using Radzen.Blazor
+@inject CurrentUserService CurrentUserService
+@inherits LayoutComponentBase
+
+<RadzenSidebarContainer>
+
+    <!-- Sidebar -->
+    <RadzenSidebar @bind-Expanded="@sidebarExpanded" Style="width: 250px;">
+        <NavMenu />
+        
+    </RadzenSidebar>
+
+    <!-- Main body -->
+    <RadzenBody>
+        <RadzenHeader>
+            
+            <RadzenStack Orientation="Orientation.Horizontal"
+                         AlignItems="AlignItems.Center"
+                         class="rz-shadow-2 rz-p-3 rz-bg-primary rz-text-white">
+              
+                <RadzenLabel Text="Fleet Management System" class="rz-text-lg rz-font-bold" />
+                
+                <RadzenSidebarToggle Click="@ToggleSidebar" />
+
+                
+
+                
+                <AuthorizeView>
+                    <Authorized>
+                        <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+                            <p style="margin: 0;">Welcome, @CurrentUserService.UserEmail!</p>
+                            <Logout />
+                        </div>
+
+
+
+        </Authorized>
+    </AuthorizeView>
+
+
+            </RadzenStack>
+        </RadzenHeader>
+
+        <div class="rz-p-4 rz-flex-grow-1 rz-overflow-auto">
+            @Body
+        </div>
+    </RadzenBody>
+
+</RadzenSidebarContainer>
+
+@code {
+    private bool sidebarExpanded = true;
+
+    private void ToggleSidebar()
+    {
+        sidebarExpanded = !sidebarExpanded;
+    }
+}

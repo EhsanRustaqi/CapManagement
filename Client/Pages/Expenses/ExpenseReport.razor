@@ -1,0 +1,194 @@
+﻿@page "/car-expense-report/{CarId:guid}"
+
+@inject IExpenseReportServiceClient ExpenseService
+
+@inject IExpenseServiceClient ExpenseServiceClient
+@inject NotificationService NotificationService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.ExpenseDtoModels
+@using CapManagement.Shared.Models
+@using CapManagement.Shared.Models.Car_CompanyReportModels
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Car Expense Report</PageTitle>
+
+<RadzenStack Gap="1.5rem">
+
+    <!-- ================= FILTER PANEL ================= -->
+    <RadzenCard Style="padding:16px">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
+
+            <RadzenDatePicker @bind-Value="fromDate"
+                              Placeholder="From date"
+                              Style="width:180px" />
+
+            <RadzenDatePicker @bind-Value="toDate"
+                              Placeholder="To date"
+                              Style="width:180px" />
+
+            <RadzenDropDown TValue="ExpenseType?"
+                            Data="@Enum.GetValues(typeof(ExpenseType))"
+                            @bind-Value="selectedType"
+                            AllowClear="true"
+                            Placeholder="Expense Type"
+                            Style="width:200px" />
+
+            <RadzenButton Text="Apply"
+                          Icon="filter_alt"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Click="@LoadReport" />
+        </RadzenStack>
+    </RadzenCard>
+
+    <!-- ================= SUMMARY CARDS ================= -->
+    @if (summary != null)
+    {
+        <RadzenRow>
+            <RadzenColumn Size="4">
+                <RadzenCard class="rz-shadow-2">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Total Gross</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H4">
+                        € @summary.TotalGrossAmount
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="4">
+                <RadzenCard class="rz-shadow-2">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Total VAT</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H4">
+                        € @summary.TotalVatAmount
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="4">
+                <RadzenCard class="rz-shadow-2">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Total Net</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H4">
+                        € @summary.TotalNetAmount
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+
+    <!-- ================= EXPENSE TABLE ================= -->
+    <RadzenDataGrid TItem="ExpenseDto"
+                    Data="@expenses"
+                    AllowPaging="true"
+                    AllowSorting="true"
+                    PageSize="10"
+                    Count="@totalCount"
+                    LoadData="@LoadExpenses"
+                    Style="height:450px">
+
+        <Columns>
+            <RadzenDataGridColumn Property="ExpenseDate" Title="Date" FormatString="{0:yyyy-MM-dd}" />
+            <RadzenDataGridColumn Property="Type" Title="Type" />
+            <RadzenDataGridColumn Property="Amount" Title="Gross (€)" />
+            <RadzenDataGridColumn Property="VatAmount" Title="VAT (€)" />
+            <RadzenDataGridColumn Property="NetAmount" Title="Net (€)" />
+            <RadzenDataGridColumn Property="Quarter" Title="Quarter" />
+        </Columns>
+
+        <FooterTemplate>
+            <strong>Total records: @totalCount</strong>
+        </FooterTemplate>
+
+    </RadzenDataGrid>
+
+</RadzenStack>
+@code {
+    [Parameter] public Guid CarId { get; set; }
+
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+
+    private bool isLoading;
+    private DateTime fromDate = DateTime.UtcNow.AddMonths(-1);
+    private DateTime toDate = DateTime.UtcNow;
+
+    private ExpenseType? selectedType;
+
+    private List<ExpenseDto> expenses = new();
+    private int totalCount;
+
+    private ExpenseReportSummaryDto? summary;
+
+    /// <summary>
+    /// Load both summary and table
+    /// </summary>
+    private async Task LoadReport()
+    {
+        await LoadSummary();
+        await LoadExpenses(new LoadDataArgs { Skip = 0, Top = 10 });
+    }
+
+    /// <summary>
+    /// Summary report (cards)
+    /// </summary>
+    private async Task LoadSummary()
+    {
+        var result = await ExpenseService.GetCarExpenseReportAsync(
+            CarId,
+            companyId,
+            fromDate,
+            toDate);
+
+        if (result.Success)
+        {
+            summary = result.Data;
+        }
+        else
+        {
+            NotifyError(result.Message);
+        }
+    }
+
+    /// <summary>
+    /// Grid data (paged)
+    /// </summary>
+    private async Task LoadExpenses(LoadDataArgs args)
+    {
+        // Radzen paging → backend paging
+        var pageSize = args.Top ?? 10;
+        var pageNumber = ((args.Skip ?? 0) / pageSize) + 1;
+
+        var result = await ExpenseServiceClient.GetExpensesByCarIdAsync(
+            CarId,
+            companyId,
+            pageNumber,
+            pageSize
+        );
+
+        if (result != null && result.Success && result.Data != null)
+        {
+            expenses = result.Data.Items;
+            totalCount = result.Data.TotalCount;
+        }
+        else
+        {
+            NotifyError(result?.Message);
+        }
+    }
+
+
+    private void NotifyError(string? message)
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = message ?? "Something went wrong",
+                Duration = 4000
+            });
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+}

@@ -1,0 +1,407 @@
+﻿@page "/expenses/create"
+@using CapManagement.Client.ClientModel
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Client.ServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.DtoModels.ExpenseDtoModels
+@inject ICarServiceClient CarClientService
+@inject IExpenseServiceClient ExpenseClientService
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+<RadzenHeading Size="H3" Text="Create Expense" class="mb-3" />
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate"
+                       Value="50" />
+}
+else if (!cars.Any())
+{
+    <RadzenCard class="text-center p-4">
+        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+        <p class="mt-2">No cars available. Please add a car first.</p>
+    </RadzenCard>
+}
+else
+{
+    <RadzenSteps Change="@OnChange" CanChange="@CanChange" @bind-SelectedIndex="currentStep" class="custom-stepper" Style="max-width: 1000px; margin: auto;">
+        <Steps>
+            <!-- Step 1: Car & Expense Type -->
+            <RadzenStepsItem Text="Car & Type" Icon="assignment">
+                <div class="p-4">
+                    <RadzenFieldset Text="Basic Info">
+                        <RadzenLabel Text="Car" />
+                        <RadzenDropDown TValue="Guid"
+                            Data="@cars"
+                            TextProperty="Brand"
+                            ValueProperty="CarId"
+                            @bind-value="expense.CarId"
+                            Style="width:100%; margin-bottom:10px;"
+                            Placeholder="Select a car"
+                            Change="@OnCarChanged"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            AllowClear="true" />
+                        @if (selectedCar != null)
+                        {
+                            <RadzenCard class="mt-3 p-3">
+                                <h5 class="font-semibold">Car Details</h5>
+                                <p><b>Car:</b> @selectedCar.Brand</p>
+                                <p><b>Car:</b> @selectedCar.NumberPlate</p>
+                                <p><b>Car:</b> @selectedCar.Model</p>
+                            </RadzenCard>
+                        }
+                        <RadzenLabel Text="Expense Type" />
+                        <RadzenDropDown TValue="ExpenseType"
+                                        Data="expenseTypeItems"
+                                        TextProperty="Name"
+                                        ValueProperty="Value"
+                                        @bind-Value="expense.Type"
+                                        Style="width:100%;" />
+                    </RadzenFieldset>
+                    <RadzenButton Text="Next"
+                                  Icon="arrow_forward"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Click="@(() => currentStep = 1)"
+                                  class="mt-3" />
+                </div>
+            </RadzenStepsItem>
+
+
+
+
+
+
+            <!-- Step 2: Financial Info -->
+            <RadzenStepsItem Text="Amount" Icon="euro">
+                <div class="p-4">
+                    <RadzenHeading Size="H4" Text="Cost Details" class="mb-3" />
+                    @if (selectedCar == null)
+                    {
+                        <RadzenCard class="text-center p-4">
+                            <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+                            <p class="mt-2">No car selected. Please go back and select a car.</p>
+                        </RadzenCard>
+                    }
+                    else
+                    {
+                        <RadzenLabel Text="Amount (Incl VAT)" />
+                        <RadzenNumeric TValue="decimal"
+                                       @bind-value="expense.Amount"
+                                       Min="0"
+                                       Change="@((decimal value) => RefreshCalculatedFields())"
+                                       Style="width:100%; margin-bottom:10px;" />
+
+                        <RadzenLabel Text="VAT Percent" />
+                        <RadzenNumeric TValue="decimal"
+                                       @bind-value="expense.VatPercent"
+                                       Min="0"
+                                       Max="100"
+                                       Change="@((decimal value) => RefreshCalculatedFields())"
+                                       Style="width:100%; margin-bottom:10px;" />
+
+                        <RadzenLabel Text="VAT Amount" />
+                        <RadzenNumeric TValue="decimal"
+                                       @bind-value="expense.VatAmount"
+                                       Min="0"
+                                       Disabled="true"
+                                       Style="width:100%; margin-bottom:10px;" />
+
+                        <RadzenLabel Text="Net Amount" />
+                        <RadzenNumeric TValue="decimal"
+                                       @bind-value="expense.NetAmount"
+                                       Min="0"
+                                       Disabled="true"
+                                       Style="width:100%; margin-bottom:10px;" />
+
+                        <RadzenLabel Text="Expense Date" />
+                        <RadzenDatePicker TValue="DateTime"
+                                          @bind-value="expense.ExpenseDate"
+                                       
+                                          Style="width:100%;" />
+
+                        <RadzenLabel Text="Quarter" />
+                        <p>@expense.Quarter</p>
+                        <div class="rz-mt-3">
+
+                            <RadzenButton Text="Back"
+                                          Icon="arrow_back"
+                                          Click="@(() => currentStep = 0)"
+                                          Style="margin-right:8px;" />
+                            <RadzenButton Text="Next"
+                                          Icon="arrow_forward"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Click="@(() => currentStep = 2)" />
+                        </div>
+                    }
+                </div>
+
+
+
+
+            </RadzenStepsItem>
+            <!-- Step 3: Summary & Submit -->
+            <RadzenStepsItem Text="Summary" Icon="check">
+                <div class="p-4">
+                    <RadzenFieldset Text="Review">
+                        <p><b>Car:</b> @selectedCarName</p>
+                        <p><b>Type:</b> @expense.Type</p>
+                        <p><b>Amount:</b> @expense.Amount:C</p>
+                        <p><b>VAT %:</b> @expense.VatPercent</p>
+                        <p><b>NetAmount:</b> @expense.NetAmount:C</p>
+                        <p><b>VAT Amount:</b> @expense.VatAmount:C</p>
+                        <p><b>Querter:</b> @expense.Quarter:C</p>
+                        <p><b>Date:</b> @expense.ExpenseDate.ToShortDateString()</p>
+                    </RadzenFieldset>
+                    <div class="rz-mt-3">
+                        <RadzenButton Text="Back"
+                                      Icon="arrow_back"
+                                      Click="@(() => currentStep = 1)"
+                                      Style="margin-right:8px;" />
+                        <RadzenButton Text="Create Expense"
+                                      Icon="save"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Click="Submit"
+                                      Disabled="@isSubmitting" />
+                        <RadzenButton Text="Cancel"
+                                      Icon="close"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Click="OnCancel"
+                                      Disabled="@isSubmitting" />
+                    </div>
+                </div>
+            </RadzenStepsItem>
+        </Steps>
+    </RadzenSteps>
+}
+@code {
+
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189f3991b");
+    private int currentStep = 0;
+    private CreateExpenseDto expense = new()
+    {
+        VatPercent = 21,
+        ExpenseDate = DateTime.Today
+    };
+
+
+
+    private List<CarDto> cars = new();
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private CarDto? selectedCar;
+    private string? selectedCarName =>
+        selectedCar?.Brand ?? "N/A";
+    [Inject] public IExpenseServiceClient ExpenseServiceClient { get; set; }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+
+            LoadExpenseTypes();
+
+            await LoadCarsAsync();
+            expense.CompanyId = _companyId;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to initialize: {ex.Message}",
+                Duration = 3000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+
+
+
+    void RefreshCalculatedFields()
+    {
+        expense.VatAmount = Math.Round(expense.Amount * expense.VatPercent / (100 + expense.VatPercent), 2);
+        expense.NetAmount = expense.Amount - expense.VatAmount;
+        expense.Quarter = ((expense.ExpenseDate.Month - 1) / 3) + 1;
+
+        StateHasChanged();
+    }
+
+    private List<ExpenseTypeItem> expenseTypeItems = new();
+
+
+    private void LoadExpenseTypes()
+    {
+        expenseTypeItems = Enum.GetValues<ExpenseType>()
+            .Select(e => new ExpenseTypeItem
+                {
+                    Value = e,
+                    Name = e.ToString()
+                })
+            .ToList();
+    }
+
+
+
+
+
+
+
+    private async Task LoadCarsAsync()
+    {
+        // Load cars (paged API requires parameters)
+        var result = await CarClientService.GetCarsAsync(
+            _companyId, 1, 10, null, null
+        );
+        if (result?.Data.Data != null)
+        {
+            cars = result.Data.Data.ToList();
+        }
+    }
+    private void OnChange()
+    {
+        HandleStepChange(currentStep);
+    }
+    private async Task CanChange(StepsCanChangeEventArgs args)
+    {
+        // Allow going backward freely (no validation)
+        if (args.SelectedIndex < currentStep)
+        {
+            return;
+        }
+        // Validate before moving forward (only if trying to leave the current step)
+        if (args.SelectedIndex > currentStep)
+        {
+            switch (currentStep)
+            {
+                case 0:
+                    if (expense.CarId == Guid.Empty || expense.Type == 0)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = "Please select a car and expense type before continuing.",
+                            Duration = 3000
+                        });
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+                case 1:
+                    if (expense.Amount <= 0)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = "Please enter a valid amount before continuing.",
+                            Duration = 3000
+                        });
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+            }
+        }
+    }
+    private void HandleStepChange(int step)
+    {
+        // Minimal handling for this form; extend if needed (e.g., dynamic content per step)
+        StateHasChanged();
+    }
+    private void OnCarChanged(object value)
+    {
+        if (value is Guid carId)
+        {
+            expense.CarId = carId;
+            selectedCar = cars.FirstOrDefault(c => c.CarId == carId);
+            if (selectedCar != null)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Info,
+                    Summary = "Car Selected",
+                    Detail = $"Car {selectedCar.Brand} selected.",
+                    Duration = 2000
+                });
+            }
+        }
+        StateHasChanged();
+    }
+
+
+    private async Task Submit()
+    {
+        isSubmitting = true;
+        try
+        {
+            var response = await ExpenseClientService.CreateExpenseAsync(expense);
+            if (response.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = response.Message ?? "Expense created successfully!",
+                        Duration = 3000  // Keep or increase to 5000 for visibility
+                    });
+
+                // Delay to allow toast to render before navigation
+                await Task.Delay(1500);  // 1.5s—tune as needed (500-2000ms)
+
+                NavigationManager.NavigateTo("/GetExpenses", forceLoad: true);
+                return;
+            }
+
+            // Error handling unchanged...
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = response.Message ?? string.Join("; ", response.Errors),
+                    Duration = 5000
+                });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void OnCancel()
+    {
+        expense = new CreateExpenseDto
+        {
+            VatPercent = 21,
+            ExpenseDate = DateTime.Today,
+            CompanyId = _companyId
+        };
+        selectedCar = null;
+        currentStep = 0;
+        NavigationManager.NavigateTo("/expenses");
+    }
+}

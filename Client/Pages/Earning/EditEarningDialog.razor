@@ -1,0 +1,197 @@
+﻿@page "/Edit-Earning-dialog/{EarningId:guid}"
+@inject IEarningServiceClient EarningClientService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.EarningDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate"
+                       Style="width:100%; margin-bottom: 20px;" />
+}
+else if (earning == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No earning found with ID: @EarningId</RadzenText>
+        <RadzenButton Text="Close" Icon="close"
+                      ButtonStyle="ButtonStyle.Light"
+                      Click="@(() => DialogService.Close(false))"
+                      Style="margin-top: 10px;" />
+    </RadzenCard>
+}
+else
+{
+    <RadzenTemplateForm TItem="EarningDto" Data="@earning"
+                      
+                        InvalidSubmit="@OnInvalidSubmit">
+
+        <RadzenFieldset Text="Edit Earning Details">
+            <RadzenStack Gap="1rem">
+
+                <RadzenFormField Text="Gross Income (€)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="earning.GrossIncome"
+                                       Name="GrossIncome" Style="width:100%" />
+                        <RadzenRequiredValidator Component="GrossIncome"
+                                                 Text="Gross Income is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="BTW (%)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="earning.BtwPercentage"
+                                       Name="BtwPercentage"
+                                       Style="width:100%" />
+                        <RadzenRequiredValidator Component="BtwPercentage"
+                                                 Text="BTW % is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="BTW Amount (€)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="earning.BtwAmount"
+                                       Name="BtwAmount"
+                                       Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Net Income (€)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="earning.NetIncome"
+                                       Name="NetIncome"
+                                       Style="width:100%" />
+                        <RadzenRequiredValidator Component="NetIncome"
+                                                 Text="Net Income is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Income Date" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="earning.IncomeDate"
+                                          Name="IncomeDate"
+                                          Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Week Start" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="earning.WeekStart"
+                                          Name="WeekStart"
+                                          Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Week End" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="earning.WeekEnd"
+                                          Name="WeekEnd"
+                                          Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Platform" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="earning.Platform"
+                                        Data="platforms"
+                                        Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenStack Orientation="Orientation.Horizontal"
+                             JustifyContent="JustifyContent.End"
+                             Gap="0.5rem">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary"
+                                  Text="Save" Icon="save"
+                                  ButtonType="ButtonType.Submit" />
+
+                    <RadzenButton ButtonStyle="ButtonStyle.Light"
+                                  Text="Cancel" Icon="close"
+                                  Click="@(() => DialogService.Close(false))" />
+                </RadzenStack>
+
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public Guid EarningId { get; set; }
+    private EarningDto? earning;
+    private bool isLoading = true;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+    private List<PlatformType> platforms = Enum.GetValues<PlatformType>().ToList();
+    [Parameter] public Guid CompanyId { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await EarningClientService.GetEarningByIdAsync(EarningId, companyId);
+        if (result != null && result.Success)
+        {
+            earning = result.Data;
+        }
+        isLoading = false;
+    }
+
+    // private async Task UpdateEarning()
+    // {
+    //     if (earning == null) return;
+
+    //     isLoading = true;
+
+    //     try
+    //     {
+    //         var result = await EarningClientService.UpdateEarningAsync(earning);
+
+    //         if (result != null && result.Success)
+    //         {
+    //             NotificationService.Notify(new NotificationMessage
+    //                 {
+    //                     Severity = NotificationSeverity.Success,
+    //                     Summary = "Success",
+    //                     Detail = "Earning updated successfully",
+    //                     Duration = 4000
+    //                 });
+
+    //             DialogService.Close(true);
+    //         }
+    //         else
+    //         {
+    //             NotificationService.Notify(new NotificationMessage
+    //                 {
+    //                     Severity = NotificationSeverity.Error,
+    //                     Summary = "Update Failed",
+    //                     Detail = string.Join("; ", result?.Errors ?? new List<string>()),
+    //                     Duration = 4000
+    //                 });
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         NotificationService.Notify(new NotificationMessage
+    //             {
+    //                 Severity = NotificationSeverity.Error,
+    //                 Summary = "Error Updating Earning",
+    //                 Detail = ex.Message
+    //             });
+    //     }
+
+    //     isLoading = false;
+    //     await InvokeAsync(StateHasChanged);
+    // }
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 3000
+            });
+    }
+}

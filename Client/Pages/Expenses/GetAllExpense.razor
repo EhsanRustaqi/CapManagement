@@ -1,0 +1,426 @@
+﻿@page "/GetExpenses"
+@inject IExpenseServiceClient ExpenseClientService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Client.ServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.DtoModels.ExpenseDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+@inject NavigationManager Navigation
+@* 
+<RadzenButton Text="Add Expense" Icon="add_circle" ButtonStyle="ButtonStyle.Primary"
+              Click="@(async args => await OpenCreateDialog())" Style="margin-top:20px" /> *@
+
+@* <RadzenDataGrid @ref="CarsGrid" AllowFiltering="true" FilterPopupRenderMode="PopupRenderMode.OnDemand"
+                AllowPaging="true" PageSize="5" AllowSorting="true"
+                Data="@Cars" Count="@totalCount" LoadData="@LoadData" TItem="CarDto"> *@
+
+
+
+<RadzenDataGrid @ref="ExpenseGrid"
+                Data="@Expenses"
+                Count="@totalCount"
+                LoadData="@LoadData"
+                TItem="ExpenseDto"
+                AllowPaging="true"
+                PagerHorizontalAlign="HorizontalAlign.Center"
+                AllowSorting="true"
+                AllowMultiColumnSorting="true"
+                AllowFiltering="true"
+                FilterMode="FilterMode.Advanced"
+                PageSize="10">
+    <Columns>
+        <RadzenDataGridColumn Width="50px" Title="#" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+            <Template Context="data">
+                @(Expenses.IndexOf(data) + ((pageNumber - 1) * pageSize) + 1)
+            </Template>
+        </RadzenDataGridColumn>
+
+        <!-- Car Link (optional) -->
+        <RadzenDataGridColumn Property="CarName" Title="Car" />
+        <RadzenDataGridColumn Title="Plate">
+            <Template Context="data">
+                <div style="
+            background-color:#FFD200;
+            color:black;
+            font-weight:bold;
+            padding:6px 12px;
+            border-radius:4px;
+            border:2px solid black;
+            display:inline-block;
+            font-family:'Arial Black', sans-serif;
+            letter-spacing:2px;
+            font-size:14px;
+            text-transform:uppercase;
+        ">
+                    @data.NumberPlate
+                </div>
+            </Template>
+        </RadzenDataGridColumn>
+
+
+        <RadzenDataGridColumn Property="Type" Title="Type" />
+
+        <!-- Amount Paid -->
+        <RadzenDataGridColumn Property="Amount" Title="Amount (€)" />
+
+        <!-- VAT Percent -->
+        <RadzenDataGridColumn Property="VatPercent" Title="VAT (%)" />
+
+        <!-- VAT Amount (calculated) -->
+        <RadzenDataGridColumn Property="VatAmount" Title="VAT Amount" />
+
+        <!-- Net Amount (calculated) -->
+        <RadzenDataGridColumn Property="NetAmount" Title="Net Amount" />
+
+        <!-- Expense Date -->
+        <RadzenDataGridColumn Property="ExpenseDate" Title="Date">
+            <Template Context="data">
+                @data.ExpenseDate.ToString("yyyy-MM-dd")
+            </Template>
+        </RadzenDataGridColumn>
+
+        <!-- Quarter -->
+        <RadzenDataGridColumn Property="Quarter" Title="Quarter" />
+
+       
+
+     
+
+        <RadzenDataGridColumn Width="160px" Title="Actions" Filterable="false" Sortable="false">
+          @*   <Template Context="Expense">
+
+
+                <RadzenButton Text="View" Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                              Click="@(args => DialogService.OpenAsync<ViewCarDialog>(
+          "Expense Details",
+          new Dictionary<string, object>() { { "CarId", Expense.CarId } },
+          new DialogOptions() { Width = "600px", Height = "500px" }))" /> *@
+
+
+                @*         <RadzenButton Icon="edit" Text="Edit" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                Click="@(() => EditCar(Expense.CarId, Expense.Brand))" />  *@
+
+
+@* 
+                <RadzenButton Icon="archive" Text="Archive" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                              Click="@(() => ConfirmArchive(Expense.CarId, Expense.Brand))" />
+            </Template> *@
+
+            <Template Context="expense">
+                <RadzenButton 
+                              Icon="edit"
+                              Size="ButtonSize.Small"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Click="@(() => OpenEditExpensesDialog(expense.ExpenseId, expense.CompanyId))" />
+
+
+
+
+
+                <RadzenButton Icon="archive"
+                              Text="Archive"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@(() => ConfirmArchive(expense.ExpenseId))" />
+       
+
+                <RadzenButton Icon="info"
+                             
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Small"
+                              Click="@(() => Navigation.NavigateTo($"/car-expense-report/{expense.CarId}"))" />
+
+
+
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private RadzenDataGrid<ExpenseDto>? ExpenseGrid;
+    private List<ExpenseDto> Expenses = new();
+
+  
+    private int totalCount;
+    private int pageNumber = 1;
+    private int pageSize = 10;
+    private bool isLoading;
+    private bool isDisposed;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B"); // Seeded CompanyId
+
+
+
+    private void GoToCarExpenseReport(Guid carId)
+    {
+        if (carId == Guid.Empty)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Invalid Car",
+                    Detail = "Please select a valid car.",
+                    Duration = 3000
+                });
+            return;
+        }
+        Navigation.NavigateTo($"/car-expense-report/{carId}");
+    }
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (isDisposed) return;
+        await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+    }
+
+
+
+
+
+    // private async Task LoadData(LoadDataArgs args)
+    // {
+    //     if (isDisposed || isLoading) return;
+    //     isLoading = true;
+    //     try
+    //     {
+    //         if (args.Skip.HasValue && args.Top.HasValue && args.Top.Value > 0)
+    //         {
+    //             pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+    //             pageSize = args.Top.Value;
+    //         }
+    //         var result = await CarClientService.GetCarsAsync(companyId, pageNumber, pageSize);
+    //         if (result != null && result.Success)
+    //         {
+    //             Cars = result.Data?.Data ?? new List<CarDto>();
+    //             totalCount = result.Data?.TotalItems ?? 0;
+    //             if (!isDisposed && CarsGrid != null)
+    //             {
+    //                 await CarsGrid.Reload();
+    //             }
+    //         }
+    //         else
+    //         {
+    //             NotificationService.Notify(new NotificationMessage
+    //                 {
+    //                     Severity = NotificationSeverity.Error,
+    //                     Summary = "Error Loading Cars",
+    //                     Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+    //                     Duration = 4000
+    //                 });
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         NotificationService.Notify(new NotificationMessage
+    //             {
+    //                 Severity = NotificationSeverity.Error,
+    //                 Summary = "Exception",
+    //                 Detail = ex.Message,
+    //                 Duration = 4000
+    //             });
+    //     }
+    //     finally
+    //     {
+    //         isLoading = false;
+    //     }
+    // }
+    private async Task LoadData(LoadDataArgs args)
+    {
+        if (isDisposed || isLoading) return;
+        isLoading = true;
+
+        try
+        {
+            if (args.Skip.HasValue && args.Top.HasValue && args.Top.Value > 0)
+            {
+                pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+                pageSize = args.Top.Value;
+            }
+
+            var result = await ExpenseClientService.GetExpenseAsync(
+                companyId,
+                pageNumber,
+                pageSize,
+                args.OrderBy,
+                args.Filter
+            );
+
+            if (result?.Success == true)
+            {
+                Expenses = result.Data.Data;
+                totalCount = result.Data.TotalItems;
+                if (!isDisposed && ExpenseGrid != null)
+                {
+                    await ExpenseGrid.Reload();
+                }
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Loading Expenses",
+                        Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Exception",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+
+
+
+    private async Task ConfirmArchive(Guid ExpenseId)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to archive Expense ?",
+            "Confirm Archive",
+            new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" }
+        );
+        if (confirmed == true)
+        {
+            var result = await ExpenseClientService.ArchiveExpenseAsync(ExpenseId, companyId);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Expense Archived",
+                        Detail = $"Expense '' archived successfully.",
+                        Duration = 4000
+                    });
+                await LoadData(new LoadDataArgs { Skip = (pageNumber - 1) * pageSize, Top = pageSize });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Archiving Expense",
+                        Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+    
+
+
+
+    private Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+
+
+    // private async Task EditCar(Guid CarId, string CarName)
+    // {
+    //     var Expense = await CarClientService.GetCarByIdAsync(CarId, companyId);
+    //     if (Expense == null || !Expense.Success)
+    //     {
+    //         NotificationService.Notify(new NotificationMessage
+    //             {
+    //                 Severity = NotificationSeverity.Error,
+    //                 Summary = "Error",
+    //                 Detail = Expense?.Errors?.Any() == true ? string.Join("; ", Expense.Errors) : "Expense not found.",
+    //                 Duration = 4000
+    //             });
+    //         return;
+    //     }
+
+    //     var parameters = new Dictionary<string, object>
+    //     {
+    //         { "Expense", Expense.Data },
+    //         { "OnSave", new Action<CarDto>(async (updatedCar) =>
+    //             {
+    //                 var result = await CarClientService.UpdateCarAsync(updatedCar);
+    //                 if (result.Success)
+    //                 {
+    //                     NotificationService.Notify(new NotificationMessage
+    //                     {
+    //                         Severity = NotificationSeverity.Success,
+    //                         Summary = "Expense Updated",
+    //                         Detail = $"Expense '{updatedCar.Brand}' updated successfully.",
+    //                         Duration = 4000
+    //                     });
+    //                     await LoadData(new LoadDataArgs { Skip = (pageNumber - 1) * pageSize, Top = pageSize });
+    //                 }
+    //                 else
+    //                 {
+    //                     NotificationService.Notify(new NotificationMessage
+    //                     {
+    //                         Severity = NotificationSeverity.Error,
+    //                         Summary = "Error Updating Expense",
+    //                         Detail = string.Join("; ", result.Errors),
+    //                         Duration = 4000
+    //                     });
+    //                 }
+    //             })
+    //         }
+    //     };
+
+    //     // await DialogService.OpenAsync<EditCarDialog>("Edit Expense", parameters, new DialogOptions { Width = "500px", Height = "auto" });
+    // }
+
+
+
+    async Task OpenEditExpensesDialog(Guid expenseId, Guid companyId)
+    {
+        var result = await DialogService.OpenAsync<EditExpensesDialog>(
+            "Edit Earning",
+            new Dictionary<string, object>
+                    {
+            { "ExpenseId", expenseId },
+            { "CompanyId", companyId }
+                    },
+            new DialogOptions { Width = "600px", Height = "auto" }
+        );
+
+        if (result = true)
+        {
+            await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+        }
+    }
+    public void Dispose()
+    {
+        isDisposed = true;
+    }
+
+
+
+
+
+
+
+
+}

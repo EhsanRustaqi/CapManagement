@@ -1,0 +1,59 @@
+﻿<h3>Create Car</h3>
+
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="CreateCarDto" Data="@Car" Submit="@OnSubmit">
+    <ChildContent>
+        <RadzenFieldset Text="Car Information">
+
+            <!-- Brand -->
+            <RadzenLabel Text="Brand" Component="Brand" />
+            <RadzenTextBox @bind-Value="Car.Brand" Name="Brand" Placeholder="Enter brand" Style="width:100%" />
+
+            <!-- Model -->
+            <RadzenLabel Text="Model" Component="Model" />
+            <RadzenTextBox @bind-Value="Car.Model" Name="Model" Placeholder="Enter model" Style="width:100%" />
+
+            <!-- Number Plate -->
+            <RadzenLabel Text="Number Plate" Component="NumberPlate" />
+            <RadzenTextBox @bind-Value="Car.NumberPlate" Name="NumberPlate" Placeholder="Enter number plate" Style="width:100%" />
+
+            <!-- Year -->
+            <RadzenLabel Text="Year" Component="Year" />
+            <RadzenNumeric @bind-Value="Car.Year" Name="Year" Placeholder="Enter year" Style="width:100%" />
+
+            <!-- Status (Enum dropdown) -->
+            <RadzenLabel Text="Status" Component="Status" />
+            <RadzenDropDown @bind-Value="Car.Status"
+                            Data="Enum.GetValues(typeof(CarStatus))"
+                            Name="Status"
+                            Style="width:100%" />
+
+            <!-- Buttons -->
+            <div class="rz-mt-3">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" Type="Submit" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(args => DialogService.Close(false))" />
+            </div>
+        </RadzenFieldset>
+    </ChildContent>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public EventCallback<CreateCarDto> OnCarCreated { get; set; }
+
+    private CreateCarDto Car = new();
+
+    // temporary hardcoded companyId
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+    private async Task OnSubmit()
+    {
+        Car.CompanyId = _companyId; // attach companyId before sending
+        await OnCarCreated.InvokeAsync(Car);
+        DialogService.Close(true);
+    }
+}

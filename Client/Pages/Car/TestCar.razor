@@ -1,0 +1,108 @@
+﻿@page "/carlookup"
+@using Radzen
+@using Radzen.Blazor
+@inject HttpClient Http
+
+<h3>Car Lookup (RDW API)</h3>
+
+<RadzenCard class="p-4" Style="max-width:600px;">
+    <RadzenLabel Text="Enter Dutch License Plate (e.g., GV123R)" />
+    <RadzenTextBox @bind-Value="licensePlate" Style="width:100%;" />
+    <RadzenButton Text="Fetch Car Info" Icon="search" Click="@FetchCarInfo" ButtonStyle="ButtonStyle.Primary" class="mt-2" />
+</RadzenCard>
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width:100%;margin-top:20px;" />
+}
+else if (carInfo != null)
+{
+    <RadzenCard class="mt-4 fade-in">
+     @*    <RadzenHeading Size="H4" Text="@carInfo.merk @carInfo.handelsbenaming" /> *@
+        <RadzenRow>
+            <RadzenColumn Size="6">
+                <p><b>Merk:</b> @carInfo.merk</p>
+                <p><b>Type:</b> @carInfo.handelsbenaming</p>
+                <p><b>Bouwjaar:</b> @(carInfo.datum_eerste_toelating_dt?.Substring(0, 4))</p>
+                <p><b>Kleur:</b> @carInfo.eerste_kleur</p>
+                <p><b>Deuren:</b> @carInfo.aantal_deuren</p>
+                <p><b>Zitplaatsen:</b> @carInfo.aantal_zitplaatsen</p>
+            </RadzenColumn>
+            <RadzenColumn Size="6">
+                <p><b>Cilinderinhoud:</b> @carInfo.cilinderinhoud cc</p>
+                <p><b>Massa ledig voertuig:</b> @carInfo.massa_ledig_voertuig kg</p>
+                <p><b>APK vervaldatum:</b> @carInfo.vervaldatum_apk</p>
+                <img src="@($"https://source.unsplash.com/featured/?{carInfo.merk},{carInfo.handelsbenaming}")"
+                     alt="@($"{carInfo.merk} {carInfo.handelsbenaming}")"
+                     style="width:300px;border-radius:8px;object-fit:cover;" />
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+}
+else if (hasError)
+{
+    <RadzenAlert Style="margin-top:20px;" Severity="AlertSeverity.Error" Summary="Car not found" Detail="No car found for that license plate." />
+}
+
+<style>
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.4s ease-in-out;
+    }
+</style>
+
+@code {
+    private string licensePlate = "";
+    private bool isLoading = false;
+    private bool hasError = false;
+
+    private CarInfo? carInfo;
+
+    public class CarInfo
+    {
+        public string? merk { get; set; }
+        public string? handelsbenaming { get; set; }
+        public string? eerste_kleur { get; set; }
+        public string? aantal_deuren { get; set; }
+        public string? aantal_zitplaatsen { get; set; }
+        public string? cilinderinhoud { get; set; }
+        public string? massa_ledig_voertuig { get; set; }
+        public string? vervaldatum_apk { get; set; }
+        public string? datum_eerste_toelating_dt { get; set; }
+    }
+
+    private async Task FetchCarInfo()
+    {
+        hasError = false;
+        carInfo = null;
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var normalizedPlate = licensePlate.ToUpper().Replace("-", "").Trim();
+            var url = $"https://opendata.rdw.nl/resource/m9d7-ebf2.json?kenteken={normalizedPlate}";
+            var result = await Http.GetFromJsonAsync<List<CarInfo>>(url);
+
+            if (result != null && result.Any())
+            {
+                carInfo = result.First();
+            }
+            else
+            {
+                hasError = true;
+            }
+        }
+        catch (Exception)
+        {
+            hasError = true;
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+}

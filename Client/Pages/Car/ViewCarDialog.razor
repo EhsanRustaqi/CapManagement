@@ -1,0 +1,168 @@
+﻿@page "/view-car-dialog"
+@inject ICarServiceClient CarClientService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width:100%; margin-bottom: 20px;" />
+}
+else if (Car == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No Car found with ID: @CarId</RadzenText>
+        <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(false))" Style="margin-top: 10px;" />
+    </RadzenCard>
+}
+else
+{
+    <RadzenTemplateForm TItem="CarDto" Data="@Car" Submit="@UpdateCar" InvalidSubmit="@OnInvalidSubmit">
+        <RadzenFieldset Text="Edit Car Details">
+            <RadzenStack Gap="1rem">
+
+                <!-- Brand -->
+                <RadzenFormField Text="Brand" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Car.Brand" Name="Brand" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Brand" Text="Brand is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Model -->
+                <RadzenFormField Text="Model" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Car.Model" Name="Model" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Model" Text="Model is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Number Plate -->
+                <RadzenFormField Text="Number Plate" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Car.NumberPlate" Name="NumberPlate" Style="width:100%" />
+                        <RadzenRequiredValidator Component="NumberPlate" Text="Number plate is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Year -->
+                <RadzenFormField Text="Year" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="Car.Year" Name="Year" Min="1980" Max="2025" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Year" Text="Year is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Status -->
+                <!-- Status -->
+                <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="Car.Status"
+                                        Data="Enum.GetValues<CarStatus>()"
+                                        Name="Status"
+                                        Style="width:100%" />
+                        <RadzenRequiredValidator Component="Status" Text="Status is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                <!-- Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" ButtonType="ButtonType.Submit" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(() => DialogService.Close(false))" />
+                </RadzenStack>
+
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public Guid CarId { get; set; }
+    private CarDto? Car;
+    private bool isLoading;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B"); // hardcoded for now
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await CarClientService.GetCarByIdAsync(CarId, companyId);
+            if (result != null && result.Success)
+            {
+                Car = result.Data;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateCar()
+    {
+        if (Car == null) return;
+
+        isLoading = true;
+        try
+        {
+            var result = await CarClientService.UpdateCarAsync(Car);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = $"Car {Car.Brand} updated successfully",
+                        Duration = 4000
+                    });
+                DialogService.Close(true); // success
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Update failed" };
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Updating Car",
+                        Detail = string.Join("; ", errors),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Updating Car",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 4000
+            });
+    }
+}

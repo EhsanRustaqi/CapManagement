@@ -1,0 +1,138 @@
+﻿@page "/settlements"
+@inject ISettlmentClientService SettlementClient
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Client.ServiceClient
+@using CapManagement.Shared.DtoModels.SettlementDtoModels
+@using Radzen
+@using Radzen.Blazor
+@inject NavigationManager NavigationManager
+
+
+
+<RadzenDataGrid @ref="SettlementGrid"
+                Data="@Settlements"
+                Count="@totalCount"
+                LoadData="@LoadData"
+                TItem="SettlementDto"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="true"
+                FilterMode="FilterMode.Advanced"
+                AllowMultiColumnSorting="true"
+                PageSize="10">
+
+    <Columns>
+        <RadzenDataGridColumn Width="50px" Title="#" Filterable="false" Sortable="false">
+            <Template Context="data">
+                @(Settlements.IndexOf(data) + ((pageNumber - 1) * pageSize) + 1)
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="SettlementId" Title="Settlement ID" />
+        <RadzenDataGridColumn Property="ContractId" Title="Contract" />
+        <RadzenDataGridColumn Title="Driver Name">
+            <Template Context="data">
+                @data.Contracts.FirstOrDefault()?.DriverName
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="PeriodStart" Title="Period Start" />
+        <RadzenDataGridColumn Property="PeriodEnd" Title="Period End" />
+        <RadzenDataGridColumn Property="GrossAmount" Title="Gross Amount" />
+        <RadzenDataGridColumn Property="NetPayout" Title="Net Payout" />
+        <RadzenDataGridColumn Property="Status" Title="Status" />
+
+        <RadzenDataGridColumn Title="Actions" Width="150px">
+            <Template Context="settlement">
+                <RadzenButton Text="View"
+                              Icon="visibility"
+                              Size="ButtonSize.Small"
+                              ButtonStyle="ButtonStyle.Info"
+                              Click="@(() => ViewSettlement(settlement.SettlementId))" />
+
+                <RadzenButton Text="Delete"
+                              Icon="delete"
+                              Size="ButtonSize.Small"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Click="@(() => ConfirmDelete(settlement.SettlementId))" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private RadzenDataGrid<SettlementDto>? SettlementGrid;
+    private List<SettlementDto> Settlements = new();
+    private int totalCount;
+    private int pageNumber = 1;
+    private int pageSize = 10;
+    private bool isLoading = false;
+    private bool isDisposed = false;
+
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        if (isDisposed || isLoading) return;
+        isLoading = true;
+
+        try
+        {
+            if (args.Skip.HasValue && args.Top.HasValue)
+            {
+                pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+                pageSize = args.Top.Value;
+            }
+
+            var result = await SettlementClient.GetAllSettlementAsync(
+                companyId, pageNumber, pageSize, args.OrderBy, args.Filter);
+
+            if (result.Success)
+            {
+                Settlements = result.Data.Data ?? new List<SettlementDto>();
+                totalCount = result.Data.TotalItems;
+
+                if (!isDisposed && SettlementGrid != null)
+                    await SettlementGrid.Reload();
+            }
+            else
+            {
+                NotificationService.Notify(
+                    new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Error,
+                            Summary = "Error Loading Settlements",
+                            Detail = string.Join("; ", result.Errors),
+                            Duration = 5000
+                        });
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private void ViewSettlement(Guid settlementId)
+    {
+        NavigationManager.NavigateTo($"/get-settlement/{settlementId}");
+    }
+   
+    private async Task ConfirmDelete(Guid settlementId)
+    {
+        var confirmed = await DialogService.Confirm("Delete this settlement?", "Confirm");
+        if (confirmed == true)
+        {
+            // Add delete logic here
+            await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+        }
+    }
+
+    public void Dispose() => isDisposed = true;
+}

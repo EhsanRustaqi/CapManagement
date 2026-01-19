@@ -1,0 +1,311 @@
+﻿@page "/Edit-Expense-dialog/{ExpenseId:guid}"
+@inject IExpenseServiceClient ExpenseClientService
+@inject ICarServiceClient CarClientService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.DtoModels.EarningDtoModels
+@using CapManagement.Shared.DtoModels.ExpenseDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate"
+                       Style="width: 100%; margin-bottom: 20px;/"></RadzenProgressBar>
+}
+
+else if (expense == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No ExpenseId found with ID: @ExpenseId</RadzenText>
+        <RadzenButton Text="Close" Icon="close"
+                      ButtonStyle="ButtonStyle.Light"
+                      Click="@(() => DialogService.Close(false))"
+                      Style="margin-top: 10px;" />
+    </RadzenCard>
+
+}
+
+
+    else
+    {
+
+
+    <RadzenTemplateForm TItem="ExpenseDto"
+                        Data="@expense"
+                        Submit="@OnValidSubmit"
+                        InvalidSubmit="@OnInvalidSubmit">
+
+            <RadzenFieldset Text="Edit Expense Details">
+                <RadzenStack Gap="1rem">
+
+                <RadzenFormField Text="Car" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="expense.CarId"
+                                        Data="@Cars"
+                                        ValueProperty="CarId"
+                                        Name="CarId"
+                                        Style="width:100%"
+                                        Placeholder="Select a car">
+
+                            <!-- How each item appears in the list -->
+                            <Template Context="car">
+                                <div>
+                                    <strong>@car.Brand</strong>
+                                    <span style="color: gray; margin-left: 8px;">
+                                        (@car.NumberPlate)
+                                    </span>
+                                </div>
+                            </Template>
+
+                            <!-- How selected item appears -->
+                            <ValueTemplate Context="car">
+                                <span>
+                                    @car.Brand (@car.NumberPlate)
+                                </span>
+                            </ValueTemplate>
+
+                        </RadzenDropDown>
+
+                        <RadzenRequiredValidator Component="CarId" Text="Car is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Amount" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="expense.Amount"
+                                       Name="Amount"
+                                       Change="@((decimal value) => RefreshCalculatedFields())"
+                                       Style="width:100%" />
+                        <RadzenRequiredValidator Component="Amount"
+                                                 Text="Amount is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                    <RadzenFormField Text="VatPercent" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="expense.VatPercent"
+                                           Name="VatPercent"
+                                       Change="@((decimal value) => RefreshCalculatedFields())"
+                                           Style="width:100%" />
+                            <RadzenRequiredValidator Component="VatPercent"
+                                                     Text="VatPercent is required" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+                    <RadzenFormField Text="VatAmount (€)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="expense.VatAmount"
+                                           Name="VatAmount"
+                                           Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+                    <RadzenFormField Text="NetAmount" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="expense.NetAmount"
+                                           Name="NetAmount"
+                                           Style="width:100%" />
+                            <RadzenRequiredValidator Component="NetAmount"
+                                                     Text="NetAmount is required" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+                    <RadzenFormField Text="ExpenseDate" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenDatePicker @bind-Value="expense.ExpenseDate"
+                                              Name="ExpenseDate"
+                                              Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+                    <RadzenFormField Text="Quarter" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="expense.Quarter"
+                                           Name="Quarter"
+                                           Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+
+                <RadzenFormField Text="Expense Type" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown TValue="ExpenseType"
+                                        @bind-Value="expense.Type"
+                                        Data="@Enum.GetValues(typeof(ExpenseType))"
+                                        Name="Type"
+                                        Style="width:100%"
+                                        Placeholder="Select expense type" />
+
+                        <RadzenRequiredValidator Component="Type"
+                                                 Text="Expense type is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+
+
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 JustifyContent="JustifyContent.End"
+                                 Gap="0.5rem">
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary"
+                                      Text="Save" Icon="save"
+                                      ButtonType="ButtonType.Submit" />
+
+                        <RadzenButton ButtonStyle="ButtonStyle.Light"
+                                      Text="Cancel" Icon="close"
+                                      Click="@(() => DialogService.Close(false))" />
+                    </RadzenStack>
+
+                </RadzenStack>
+            </RadzenFieldset>
+        </RadzenTemplateForm>
+
+    }
+}
+
+
+@code {
+    [Parameter] public Guid ExpenseId { get; set; }
+
+    private ExpenseDto? expense;
+
+
+    private UpdateExpenseDto? updateExpenseDto;
+    private bool isLoading = true;
+
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<CarDto> Cars = new();
+
+    void RefreshCalculatedFields()
+    {
+        expense.VatAmount = Math.Round(expense.Amount * expense.VatPercent / (100 + expense.VatPercent), 2);
+        expense.NetAmount = expense.Amount - expense.VatAmount;
+        expense.Quarter = ((expense.ExpenseDate.Month - 1) / 3) + 1;
+
+        StateHasChanged();
+    }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await ExpenseClientService.GetExpenseByIdAsync(ExpenseId, CompanyId);
+
+        if (result != null && result.Success)
+
+        {
+            expense = result.Data;
+        }
+
+        StateHasChanged();
+        isLoading = false;
+      
+
+       await GetAllCarAsync();
+    }
+
+
+    private async Task GetAllCarAsync()
+    {
+        var car = await CarClientService.GetCarsAsync(companyId);
+
+        if (car != null && car.Success && car.Data != null)
+        {
+            Cars = car.Data.Data;
+        }
+        else
+        {
+            Cars = new List<CarDto>();
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Loading Cars",
+                    Detail = "Failed to load car list.",
+                    Duration = 4000
+                });
+        }
+    }
+
+
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 3000
+            });
+    }
+
+
+    private async Task OnValidSubmit()
+    {
+        if (expense == null)
+            return;
+
+        try
+        {
+            // ✅ Map ExpenseDto → UpdateExpenseDto
+            var updateExpenseDto = new UpdateExpenseDto
+                {
+                    ExpenseId = expense.ExpenseId,
+                    CompanyId = expense.CompanyId,
+                    CarId = expense.CarId,
+                    Type = expense.Type,
+                    Amount = expense.Amount,
+                    VatPercent = expense.VatPercent,
+                    // VatAmount = expense.VatAmount,
+                    // NetAmount = expense.NetAmount,
+                    ExpenseDate = expense.ExpenseDate,
+                    Quarter = expense.Quarter
+                };
+
+            var result = await ExpenseClientService.UpdateExpenseAsync(updateExpenseDto);
+
+            if (result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = "Expense updated successfully.",
+                        Duration = 3000
+                    });
+
+                DialogService.Close(true);
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Update failed",
+                        Detail = result.Message ?? "Failed to update expense.",
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+    }
+
+}

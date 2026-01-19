@@ -1,0 +1,29 @@
+﻿@using CapManagement.Client.Auth
+@using CapManagement.Client.ServiceClient
+@using Microsoft.AspNetCore.Components.Authorization
+@using Radzen
+@using Radzen.Blazor
+@inject JwtAuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject LocalStorageService LocalStorage
+@inject IJSRuntime JS
+
+<RadzenButton Text="Logout"
+              Icon="logout"
+              ButtonStyle="ButtonStyle.Danger"
+              Click="@LogoutAsync"
+              Style="margin-left: 10px;" />
+
+@code {
+    private async Task LogoutAsync()
+    {
+        // Remove token
+        // await JS.InvokeVoidAsync("localStorage.removeItem", "accessToken");
+        await LocalStorage.RemoveItemAsync("accessToken");
+        // Notify auth state
+        AuthStateProvider.NotifyUserLogout();
+
+        // Redirect to login
+        Navigation.NavigateTo("/login", true);
+    }
+}

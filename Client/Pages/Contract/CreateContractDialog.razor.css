@@ -1,0 +1,8 @@
+﻿/* Only affect the stepper with class 'custom-stepper' */
+.custom-stepper .rz-steps > ul > li.rz-steps-item {
+    margin-bottom: 1.5rem !important;
+}
+
+.custom-stepper .rz-steps-connector {
+    border-top: 2px solid var(--rz-base-300) !important;
+}

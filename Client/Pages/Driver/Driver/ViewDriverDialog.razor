@@ -1,0 +1,165 @@
+﻿@page "/view-driver-dialog"
+@inject IDriverSericeClient DriverClientService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.DriverDtoModels
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width:100%; margin-bottom: 20px;" />
+}
+else if (driver == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No driver found with ID: @DriverId</RadzenText>
+        <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(false))" Style="margin-top: 10px;" />
+    </RadzenCard>
+}
+else
+{
+    <RadzenTemplateForm TItem="DriverDto" Data="@driver" Submit="@UpdateDriver" InvalidSubmit="@OnInvalidSubmit">
+        <RadzenFieldset Text="Edit Driver Details">
+            <RadzenStack Gap="1rem">
+
+                <!-- First Name -->
+                <RadzenFormField Text="First Name" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="driver.DriverName" Name="DriverName" Style="width:100%" />
+                        <RadzenRequiredValidator Component="DriverName" Text="First name is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Last Name -->
+                <RadzenFormField Text="Last Name" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="driver.LastName" Name="LastName" Style="width:100%" />
+                        <RadzenRequiredValidator Component="LastName" Text="Last name is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- License Number -->
+                <RadzenFormField Text="License Number" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="driver.LicenseNumber" Name="LicenseNumber" Style="width:100%" />
+                        <RadzenRequiredValidator Component="LicenseNumber" Text="License number is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Phone Number -->
+                <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="driver.Phonenumber" Name="PhoneNumber" Style="width:100%" />
+                        <RadzenRequiredValidator Component="PhoneNumber" Text="Phone number is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Date of Birth -->
+                <RadzenFormField Text="Date of Birth" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="driver.DateOfBirth" Name="DateOfBirth" DateFormat="yyyy-MM-dd" Style="width:100%" />
+                        <RadzenRequiredValidator Component="DateOfBirth" Text="Date of birth is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Status -->
+               
+
+                <!-- Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" ButtonType="ButtonType.Submit" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(() => DialogService.Close(false))" />
+                </RadzenStack>
+
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public Guid DriverId { get; set; }
+    private DriverDto? driver;
+    private bool isLoading;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B"); // hardcoded for now
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await DriverClientService.GetDriverByIdAsync(DriverId, companyId);
+            if (result != null && result.Success)
+            {
+                driver = result.Data;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateDriver()
+    {
+        if (driver == null) return;
+
+        isLoading = true;
+        try
+        {
+            var result = await DriverClientService.UpdateDriverAsync(driver);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = $"Driver {driver.DriverName} updated successfully",
+                        Duration = 4000
+                    });
+                DialogService.Close(true); // success
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Update failed" };
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Updating Driver",
+                        Detail = string.Join("; ", errors),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Updating Driver",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 4000
+            });
+    }
+}

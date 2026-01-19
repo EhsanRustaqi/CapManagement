@@ -1,0 +1,158 @@
+﻿@page "/Creat/car-rdw"
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Client.ServiceClient
+@using Radzen
+@using Radzen.Blazor
+
+@inject ICarServiceClient CarServiceClient
+@inject NotificationService NotificationService
+<RadzenHeading Size="H3" Text="Fetch Car Information (RDW API)" class="mb-4 text-primary" />
+
+<RadzenCard class="p-4 shadow-lg rounded-2xl border border-gray-200">
+
+    <RadzenFieldset Text="Enter License Plate (Kenteken)" class="mb-3">
+        <RadzenTextBox @bind-Value="NumberPlate"
+                       Placeholder="e.g. AB123C"
+                       Style="width: 250px;"
+                       MaxLength="10" />
+        <RadzenButton Icon="search"
+                      Text="Fetch from RDW"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Class="ml-3"
+                      Click="FetchCarFromRdw"
+                      Disabled="@string.IsNullOrWhiteSpace(NumberPlate)" />
+    </RadzenFieldset>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center items-center p-4">
+            <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+
+    @if (fetchedCar != null)
+    {
+        <RadzenFieldset Text="Fetched Car Details" class="mt-4">
+            <div class="grid grid-cols-2 gap-6">
+
+                <RadzenCard class="p-4 shadow-md border rounded-2xl">
+                    <RadzenHeading Size="H5" Text="General Info" class="mb-3 text-primary" />
+                    <p><b>Number Plate:</b> @fetchedCar.NumberPlate</p>
+                    <p><b>Brand:</b> @fetchedCar.Brand</p>
+                    <p><b>Model:</b> @fetchedCar.Model</p>
+                    <p><b>Year:</b> @fetchedCar.Year</p>
+                    <p><b>Color:</b> @fetchedCar.Color</p>
+                </RadzenCard>
+
+                <RadzenCard class="p-4 shadow-md border rounded-2xl">
+                    <RadzenHeading Size="H5" Text="Technical Specs" class="mb-3 text-primary" />
+                    <p><b>Type:</b> @fetchedCar.VehicleType</p>
+                    <p><b>Fuel:</b> @fetchedCar.FuelType</p>
+                    <p><b>Doors:</b> @fetchedCar.NumberOfDoors</p>
+                    <p><b>Seats:</b> @fetchedCar.NumberOfSeats</p>
+                    <p><b>Engine (cc):</b> @fetchedCar.EngineCapacity</p>
+                    <p><b>Weight (kg):</b> @fetchedCar.EmptyWeight</p>
+                    <p>
+                        <b>APK Expiry:</b>
+                    <p><b>APK Expiry:</b> @(string.IsNullOrWhiteSpace(fetchedCar.ApkExpirationDate) ? "N/A" : fetchedCar.ApkExpirationDate)</p>
+
+                    </p>
+                </RadzenCard>
+
+            </div>
+
+
+            <div class="mt-4">
+                <RadzenButton Icon="save"
+                              Text="Create Car in System"
+                              ButtonStyle="ButtonStyle.Success"
+                              Click="CreateCarAsync"
+                              Disabled="@(fetchedCar == null)" />
+            </div>
+        </RadzenFieldset>
+    }
+
+    @if (errorMessage != null)
+    {
+        <RadzenAlert Severity="AlertSeverity.Error" Summary="Error" Detail="@errorMessage" />
+    }
+</RadzenCard>
+
+@code {
+    // temporary hardcoded companyId
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+    private string NumberPlate { get; set; } = string.Empty;
+    private CarDto? fetchedCar;
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    private async Task FetchCarFromRdw()
+    {
+        errorMessage = null;
+        isLoading = true;
+
+        try
+        {
+            fetchedCar = await CarServiceClient.GetCarInfoFromRdwAsync(NumberPlate);
+
+            if (fetchedCar == null)
+                errorMessage = "No car found for this license plate.";
+            else
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = $"Car info fetched successfully for {NumberPlate}.",
+                        Duration = 3000
+                    });
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to fetch car: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateCarAsync()
+    {
+        if (fetchedCar is null)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Please fetch the car details first.");
+            return;
+        }
+        var createDto = new CreateCarDto
+            {
+                CarId = Guid.NewGuid(),              // optional — if your backend sets this, you can omit
+                Brand = fetchedCar.Brand,
+                Model = fetchedCar.Model,
+                NumberPlate = fetchedCar.NumberPlate,
+                Year = fetchedCar.Year,
+                Color = fetchedCar.Color,
+                VehicleType = fetchedCar.VehicleType,
+                FuelType = fetchedCar.FuelType,
+                NumberOfDoors = fetchedCar.NumberOfDoors,
+                NumberOfSeats = fetchedCar.NumberOfSeats,
+                EngineCapacity = fetchedCar.EngineCapacity,
+                EmptyWeight = fetchedCar.EmptyWeight,
+                ApkExpirationDate = fetchedCar.ApkExpirationDate,
+                CompanyId = _companyId,
+               
+            };
+
+
+        var result = await CarServiceClient.CreateCarsAsync(createDto);
+
+        if (result.Success)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Car Created", $"Car {createDto.Brand} {createDto.Model} successfully added!");
+        }
+        else
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", result.Errors?.FirstOrDefault() ?? "Failed to create car");
+        }
+    }
+}

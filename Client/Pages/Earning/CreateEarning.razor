@@ -1,0 +1,808 @@
+﻿@page "/create-earning"
+@using CapManagement.Client.ServiceClient
+
+@using CapManagement.Shared.DtoModels.EarningDtoModels
+@using CapManagement.Shared.DtoModels.ContractDto
+@using CapManagement.Shared.Models
+@using CapManagement.Client.IServiceClient
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+@inject IContractServiceClient ContractServiceClient
+
+@inject NotificationService NotificationService
+@inject NavigationManager NavigationManage
+
+@inject IJSRuntime JSRuntime
+
+
+<RadzenHeading Size="H3" Text="Create Weekly Earnings" class="mb-3" />
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" />
+}
+else if (!contracts.Any())
+{
+    <RadzenCard class="text-center p-4">
+        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+        <p class="mt-2">No contracts available. Please create a contract first.</p>
+    </RadzenCard>
+}
+else
+{
+    <RadzenSteps Change="@OnChange" CanChange="@CanChange" @bind-SelectedIndex="currentStep" class="custom-stepper" Style="max-width: 1000px; margin: auto;">
+        <Steps>
+           
+            <RadzenStepsItem Text="Select Contract" Icon="assignment">
+                <div class="p-4">
+                    <RadzenLabel Text="Select Active Contract" Component="ContractDropdown" />
+                    <RadzenDropDown @bind-Value="selectedContractId"
+                                    Data="@contracts"
+                                    TextProperty="Conditions"
+                                    ValueProperty="ContractId"
+                                    Style="width: 100%; max-width: 600px;"
+                                    Placeholder="-- Select an active contract --"
+                                    Change="OnContractChanged"
+                                    AllowFiltering="true"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    AllowClear="true"
+                                    Disabled="@(!contracts.Any())" />
+
+
+                    @if (selectedContract != null)
+                    {
+                        <RadzenCard class="mt-3 p-3">
+                            <h5 class="font-semibold">Contract Details</h5>
+                            <p><b>Driver:</b> @selectedContract.DriverName</p>
+                            <p><b>Car:</b> @(selectedContract.CarName ?? "N/A")</p>
+                            <p><b>Status:</b> @selectedContract.Status</p>
+                            <p><b>Conditions:</b> @selectedContract.Conditions</p>
+
+                            <RadzenButton Text="Next"
+                                          Icon="arrow_forward"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Click="@(() => currentStep = 1)"
+                                          class="mt-3" />
+                        </RadzenCard>
+                    }
+                    else
+                    {
+                        <p class="mt-3 text-muted">Please select an active contract to continue.</p>
+                    }
+                </div>
+            </RadzenStepsItem>
+
+            <!-- Step 2: Uber Earnings -->
+            <RadzenStepsItem Text="Uber Earnings" Icon="calendar_month">
+                <RadzenHeading Size="H4" Text="Uber Earnings" class="mb-3" />
+                @if (selectedContract == null)
+                {
+                    <RadzenCard class="text-center p-4">
+                        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+                        <p class="mt-2">No contract selected. Please go back and select a contract.</p>
+                    </RadzenCard>
+                }
+                else
+                {
+                    @foreach (var earning in currentPlatform.Earnings)
+                    {
+                        <RadzenCard class="mb-3 p-3">
+                            <h6>Week @(currentPlatform.Earnings.IndexOf(earning) + 1)</h6>
+                            <RadzenRow>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week Start" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekStart"
+                                                      DateRender="@(args => args.Disabled = args.Date.DayOfWeek != DayOfWeek.Monday)"
+                                                      Change="@(() => earning.WeekEnd = earning.WeekStart.AddDays(6))" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week End" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekEnd"
+                                                      Disabled="true" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenRow class="mt-3">
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Gross Income (€)" />
+                                    <RadzenNumeric @bind-Value="earning.GrossIncome"
+                                                   Min="0"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+
+                                </RadzenColumn>
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="BTW (%)" />
+                                    <RadzenNumeric @bind-Value="earning.BtwPercentage"
+                                                   Min="0"
+                                                   Max="100"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+                                </RadzenColumn>
+
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Neto Income" />
+                                    <RadzenNumeric @bind-Value="earning.NetIncome" Min="0" Max="100" Disabled="true"/>
+                                </RadzenColumn>
+
+
+                            </RadzenRow>
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Text="Remove Week"
+                                          Click="@(() => RemoveEarning(earning))"
+                                          class="mt-2" />
+                        </RadzenCard>
+                    }
+                    <RadzenButton Icon="add"
+                                  Text="Add Next Week"
+                                  Click="@AddEarning"
+                                  ButtonStyle="ButtonStyle.Success"
+                                  class="mt-2" />
+                }
+            </RadzenStepsItem>
+            <!-- Step 3: Bolt Earnings -->
+            <RadzenStepsItem Text="Bolt Earnings" Icon="calendar_month">
+                <RadzenHeading Size="H4" Text="Bolt Earnings" class="mb-3" />
+                @if (selectedContract == null)
+                {
+                    <RadzenCard class="text-center p-4">
+                        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+                        <p class="mt-2">No contract selected. Please go back and select a contract.</p>
+                    </RadzenCard>
+                }
+                else
+                {
+                    @foreach (var earning in currentPlatform.Earnings)
+                    {
+                        <RadzenCard class="mb-3 p-3">
+                            <h6>Week @(currentPlatform.Earnings.IndexOf(earning) + 1)</h6>
+                            <RadzenRow>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week Start" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekStart"
+                                                      DateRender="@(args => args.Disabled = args.Date.DayOfWeek != DayOfWeek.Monday)"
+                                                      Change="@(() => earning.WeekEnd = earning.WeekStart.AddDays(6))" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week End" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekEnd"
+                                                      Disabled="true" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                           
+                                <RadzenRow class="mt-3">
+                                    <RadzenColumn Size="4">
+                                        <RadzenLabel Text="Gross Income (€)" />
+                                        <RadzenNumeric @bind-Value="earning.GrossIncome"
+                                                       Min="0"
+                                                       Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="4">
+                                        <RadzenLabel Text="BTW (%)" />
+                                        <RadzenNumeric @bind-Value="earning.BtwPercentage"
+                                                       Min="0"
+                                                       Max="100"
+                                                       Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+                                    </RadzenColumn>
+
+                                    <RadzenColumn Size="4">
+                                        <RadzenLabel Text="Neto Income" />
+                                        <RadzenNumeric @bind-Value="earning.NetIncome" Min="0" Max="100" Disabled="true" />
+                                    </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Text="Remove Week"
+                                          Click="@(() => RemoveEarning(earning))"
+                                          class="mt-2" />
+                        </RadzenCard>
+                    }
+                    <RadzenButton Icon="add"
+                                  Text="Add Next Week"
+                                  Click="@AddEarning"
+                                  ButtonStyle="ButtonStyle.Success"
+                                  class="mt-2" />
+                }
+            </RadzenStepsItem>
+            <!-- Step 4: SnelEenTaxi Earnings -->
+            <RadzenStepsItem Text="SnelEenTaxi Earnings" Icon="calendar_month">
+                <RadzenHeading Size="H4" Text="SnelEenTaxi Earnings" class="mb-3" />
+                @if (selectedContract == null)
+                {
+                    <RadzenCard class="text-center p-4">
+                        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+                        <p class="mt-2">No contract selected. Please go back and select a contract.</p>
+                    </RadzenCard>
+                }
+                else
+                {
+                    @foreach (var earning in currentPlatform.Earnings)
+                    {
+                        <RadzenCard class="mb-3 p-3">
+                            <h6>Week @(currentPlatform.Earnings.IndexOf(earning) + 1)</h6>
+                            <RadzenRow>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week Start" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekStart"
+                                                      DateRender="@(args => args.Disabled = args.Date.DayOfWeek != DayOfWeek.Monday)"
+                                                      Change="@(() => earning.WeekEnd = earning.WeekStart.AddDays(6))" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week End" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekEnd"
+                                                      Disabled="true" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenRow class="mt-3">
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Gross Income (€)" />
+                                    <RadzenNumeric @bind-Value="earning.GrossIncome"
+                                                   Min="0"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+
+                                </RadzenColumn>
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="BTW (%)" />
+                                    <RadzenNumeric @bind-Value="earning.BtwPercentage"
+                                                   Min="0"
+                                                   Max="100"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+                                </RadzenColumn>
+
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Neto Income" />
+                                    <RadzenNumeric @bind-Value="earning.NetIncome" Min="0" Max="100" Disabled="true" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Text="Remove Week"
+                                          Click="@(() => RemoveEarning(earning))"
+                                          class="mt-2" />
+                        </RadzenCard>
+                    }
+                    <RadzenButton Icon="add"
+                                  Text="Add Next Week"
+                                  Click="@AddEarning"
+                                  ButtonStyle="ButtonStyle.Success"
+                                  class="mt-2" />
+                }
+            </RadzenStepsItem>
+
+
+
+            <!-- Step 5: SumUp Earnings -->
+            <RadzenStepsItem Text="SumUp Earnings" Icon="calendar_month">
+                <RadzenHeading Size="H4" Text="SumUp Earnings" class="mb-3" />
+                @if (selectedContract == null)
+                {
+                    <RadzenCard class="text-center p-4">
+                        <RadzenIcon Icon="warning" Style="font-size: 48px; color: var(--rz-base-500);" />
+                        <p class="mt-2">No contract selected. Please go back and select a contract.</p>
+                    </RadzenCard>
+                }
+                else
+                {
+                    @foreach (var earning in currentPlatform.Earnings)
+                    {
+                        <RadzenCard class="mb-3 p-3">
+                            <h6>Week @(currentPlatform.Earnings.IndexOf(earning) + 1)</h6>
+                            <RadzenRow>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week Start" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekStart"
+                                                      DateRender="@(args => args.Disabled = args.Date.DayOfWeek != DayOfWeek.Monday)"
+                                                      Change="@(() => earning.WeekEnd = earning.WeekStart.AddDays(7))" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <RadzenLabel Text="Week End" />
+                                    <RadzenDatePicker @bind-Value="earning.WeekEnd"
+                                                      />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenRow class="mt-3">
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Gross Income (€)" />
+                                    <RadzenNumeric @bind-Value="earning.GrossIncome"
+                                                   Min="0"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+
+                                </RadzenColumn>
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="BTW (%)" />
+                                    <RadzenNumeric @bind-Value="earning.BtwPercentage"
+                                                   Min="0"
+                                                   Max="100"
+                                                   Change="@((decimal value) => OnIncomeChanged(earning))" />
+
+                                </RadzenColumn>
+
+                                <RadzenColumn Size="4">
+                                    <RadzenLabel Text="Neto Income" />
+                                    <RadzenNumeric @bind-Value="earning.NetIncome" Min="0" Max="100" Disabled="true" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Text="Remove Week"
+                                          Click="@(() => RemoveEarning(earning))"
+                                          class="mt-2" />
+                        </RadzenCard>
+                    }
+                    <RadzenButton Icon="add"
+                                  Text="Add Next Week"
+                                  Click="@AddEarning"
+                                  ButtonStyle="ButtonStyle.Success"
+                                  class="mt-2" />
+                    <div class="rz-mt-3">
+                        <RadzenButton Text="Save All"
+                                      Icon="save"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Click="@OnSubmit"
+                                      Disabled="@isLoading" />
+                        <RadzenButton Text="Cancel"
+                                      Icon="close"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Click="@OnCancel"
+                                      Disabled="@isLoading" />
+                    </div>
+
+
+                   
+
+                }
+
+
+                <div class="rz-mt-3">
+                    <RadzenButton Text="Save All" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@OnSubmit" Disabled="@isLoading" />
+                   @*  <RadzenButton Text="Go to Settlement Preview"
+                                  Icon="arrow_forward"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Click="@GoToSettlementPreviewAsync"
+                                  Disabled="@(!allPlatformEarnings.Any(p => p.Earnings.Any()))" /> *@
+
+                    <button @onclick="GoToSettlementPreviewAsync" class="btn btn-secondary">Test Preview (No Radzen)</button>
+                    <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@OnCancel" Disabled="@isLoading" />
+                </div>
+            </RadzenStepsItem>
+        </Steps>
+    </RadzenSteps>
+}
+@code {
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189f3991b");
+    private int currentStep = 0;
+
+
+    private Guid? selectedContractId;
+
+
+
+    private CreateEarningDto earning = new();
+
+
+
+    private bool isLoading = true;
+    private ContractDto? selectedContract;
+    private PlatformEarningForm currentPlatform = new();
+    private List<PlatformEarningForm> allPlatformEarnings = new();
+    private List<ContractDto> contracts = new();
+    private List<PlatformType> platformOrder = new();
+
+
+
+
+
+
+
+    private List<CreateEarningDto> earnings = new();
+
+
+
+    [Inject] NavigationManager NavigationManager { get; set; }
+
+    [Inject] LocalStorageService LocalStorageService { get; set; } = default!;
+
+
+    
+
+    // private async Task GoToSettlementPreviewAsync()
+    // {
+    //     // Populate earnings...
+    //     if (earnings == null || !earnings.Any())
+    //     {
+    //         earnings = allPlatformEarnings.SelectMany(p => p.Earnings).ToList();
+    //     }
+
+    //     if (!earnings.Any())
+    //     {
+    //         NotificationService.Notify(new NotificationMessage { /* ... warning ... */ });
+    //         return;
+    //     }
+
+    //     var storageKey = $"earnings_preview_{Guid.NewGuid():N}[..8]";  // Use GUID for uniqueness (no time sync issues)
+
+    //     await LocalStorageService.SetItemAsync(storageKey, earnings);
+    //     await LocalStorageService.SetItemAsync($"{storageKey}_ttl", DateTime.UtcNow.AddMinutes(30).ToString("O"));
+
+    //     // Navigate WITH the key as query param (short & safe)
+    //     NavigationManager.NavigateTo($"/Settlement-preview?key={storageKey}");
+    // }
+    private async Task GoToSettlementPreviewAsync()
+    {
+        Console.WriteLine("Preview button clicked—starting collection...");  // Debug: Confirm event fires
+
+        // Explicitly initialize all platforms if missing (ensures SelectMany sees everything)
+        foreach (var plat in platformOrder)
+        {
+            if (!allPlatformEarnings.Any(p => p.Platform == plat))
+            {
+                var newPlatform = new PlatformEarningForm { Platform = plat };
+                allPlatformEarnings.Add(newPlatform);
+                Console.WriteLine($"Initialized empty platform: {plat}");  // Debug
+            }
+        }
+
+        // Now populate from ALL platforms
+        earnings = allPlatformEarnings.SelectMany(p => p.Earnings).ToList();
+
+        // Log per-platform counts for debug
+        foreach (var plat in platformOrder)
+        {
+            var count = allPlatformEarnings.First(p => p.Platform == plat).Earnings.Count;
+            Console.WriteLine($"Platform {plat}: {count} weeks");  // Your existing log
+        }
+        Console.WriteLine($"Total earnings collected: {earnings.Count}");  // Your existing log
+
+        if (!earnings.Any())
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "No Data",
+                    Detail = "Please add earnings for at least one platform before previewing.",
+                    Duration = 3000
+                });
+            return;
+        }
+
+        // FIXED: Generate Guid safely (no invalid format in interpolation)
+        var fullGuid = Guid.NewGuid().ToString("N");  // Full 32-char lowercase hex
+        var guidPart = fullGuid[..8];  // Slice first 8 chars (C# 8+; use Substring(0, 8) for older)
+        var storageKey = $"earnings_preview_{guidPart}";  // e.g., "earnings_preview_12345678"
+
+        Console.WriteLine($"Generated key: {storageKey}");  // Debug: Verify key
+
+        await LocalStorageService.SetItemAsync(storageKey, earnings);
+        await LocalStorageService.SetItemAsync($"{storageKey}_ttl", DateTime.UtcNow.AddMinutes(30).ToString("O"));
+
+        // Navigate with key (short & safe)
+        NavigationManager.NavigateTo($"/settlement-preview?key={storageKey}");
+    }
+
+
+
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        platformOrder = Enum.GetValues<PlatformType>().ToList();
+        var response = await ContractServiceClient.GetContractAsync(_companyId, 1, 100, null, null);
+
+        if (response.Success)
+        {
+            contracts = (response.Data.Data ?? new List<ContractDto>())
+                .Where(c => c.Status == ContractStatus.Active) // ✅ Only Active
+                .ToList();
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = "Failed to load contracts.",
+                    Duration = 3000
+                });
+        }
+
+        isLoading = false;
+    }
+    private void OnChange()
+    {
+        // optional logic when changing steps
+        HandleStepChange(currentStep);
+    }
+    private async Task CanChange(StepsCanChangeEventArgs args)
+    {
+        // Allow going backward freely (no validation)
+        if (args.SelectedIndex < currentStep)
+        {
+            return;
+        }
+        // Validate before moving forward (only if trying to leave the current step)
+        if (args.SelectedIndex > currentStep)
+        {
+            switch (currentStep)
+            {
+                case 0:
+                    if (selectedContract == null)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                            {
+                                Severity = NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Please select a contract before continuing.",
+                                Duration = 3000
+                            });
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+                case 1:
+                case 2:
+                case 3:
+                    var prevPlat = platformOrder[currentStep - 1];
+                    var prevPlatform = allPlatformEarnings.FirstOrDefault(p => p.Platform == prevPlat);
+                    if (prevPlatform?.Earnings == null || !prevPlatform.Earnings.Any())
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                            {
+                                Severity = NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Please add at least one week earning before continuing.",
+                                Duration = 3000
+                            });
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+                case 4:
+                    var lastPlat = platformOrder[3];
+                    var lastPlatform = allPlatformEarnings.FirstOrDefault(p => p.Platform == lastPlat);
+                    if (lastPlatform?.Earnings == null || !lastPlatform.Earnings.Any())
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                            {
+                                Severity = NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Please add at least one week earning before saving.",
+                                Duration = 3000
+                            });
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+            }
+        }
+        // If valid (or same step), do nothing—binding updates currentStep post-event
+    }
+
+
+    // private void HandleStepChange(int step)
+    // {
+    //     if (step >= 1 && step <= 4)
+    //     {
+    //         if (selectedContract == null)
+    //         {
+    //             // Safety check, should not reach here
+    //             currentStep = 0;
+    //             StateHasChanged();
+    //             return;
+    //         }
+    //         var plat = platformOrder[step - 1];
+    //         currentPlatform = allPlatformEarnings.FirstOrDefault(p => p.Platform == plat) ?? new PlatformEarningForm { Platform = plat };
+    //         if (!allPlatformEarnings.Contains(currentPlatform)) allPlatformEarnings.Add(currentPlatform);
+    //         if (!currentPlatform.Earnings.Any()) AddEarning();
+    //     }
+    //     else if (step == 0)
+    //     {
+    //         currentPlatform = new PlatformEarningForm();
+    //     }
+    //     StateHasChanged();
+    // }
+    private void HandleStepChange(int step)
+    {
+        if (step >= 1 && step <= 4)
+        {
+            if (selectedContract == null)
+            {
+                // Safety check, should not reach here
+                currentStep = 0;
+                StateHasChanged();
+                return;
+            }
+            var plat = platformOrder[step - 1];
+            currentPlatform = allPlatformEarnings.FirstOrDefault(p => p.Platform == plat) ?? new PlatformEarningForm { Platform = plat };
+            if (!allPlatformEarnings.Contains(currentPlatform)) allPlatformEarnings.Add(currentPlatform);
+
+            // AUTO-ADD 3 SEQUENTIAL WEEKS (instead of just 1)
+            // if (!currentPlatform.Earnings.Any())
+            // {
+            //     for (int i = 0; i < 3; i++)
+            //     {
+            //         AddEarning();  // Reuses your existing date/income logic (e.g., sequential Mondays)
+            //     }
+            //     Console.WriteLine($"Auto-added 3 weeks for platform {plat}");  // Optional debug log
+            // }
+        }
+        else if (step == 0)
+        {
+            currentPlatform = new PlatformEarningForm();
+        }
+        StateHasChanged();
+    }
+
+
+    private void SelectContract(ContractDto contract)
+    {
+        selectedContract = contract;
+        NotificationService.Notify(new NotificationMessage
+            {
+                // Severity = NotificationSeverity,
+                Summary = "Selected",
+                Detail = $"Contract for {contract.DriverName} selected.",
+                Duration = 2000
+            });
+        StateHasChanged();
+    }
+
+
+
+    private void AddEarning()
+    {
+        if (selectedContract == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = "Please select a contract first.",
+                    Duration = 3000
+                });
+            return;
+        }
+        DateTime weekStart;
+        if (currentPlatform.Earnings.Any())
+        {
+            var lastEnd = currentPlatform.Earnings.Max(e => e.WeekEnd);
+            weekStart = lastEnd.AddDays(1);
+        }
+        else
+        {
+            var today = DateTime.Today;
+            var offset = ((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+            weekStart = today.AddDays(-offset);
+        }
+        var weekEnd = weekStart.AddDays(6);
+        currentPlatform.Earnings.Add(new CreateEarningDto
+            {
+                CompanyId = _companyId,
+                ContractId = selectedContract.ContractId,
+                Platform = currentPlatform.Platform,
+                WeekStart = weekStart,
+                WeekEnd = weekEnd
+            });
+        StateHasChanged();
+    }
+
+
+
+    private void RemoveEarning(CreateEarningDto earning)
+    {
+        currentPlatform.Earnings.Remove(earning);
+        StateHasChanged();
+    }
+
+
+
+
+    private void OnIncomeChanged(CreateEarningDto earning)
+    {
+        if (earning != null)
+        {
+            earning.BtwAmount = Math.Round(earning.GrossIncome * (earning.BtwPercentage / 100m), 2);
+            earning.NetIncome = earning.GrossIncome - earning.BtwAmount;
+        }
+        StateHasChanged();
+    }
+
+
+
+
+    private async Task OnSubmit()
+    {
+        if (isLoading || selectedContract == null) return;
+        isLoading = true;
+        try
+        {
+            // TODO: Call actual save service here, e.g., await EarningServiceClient.SaveEarningsAsync(allPlatformEarnings.SelectMany(p => p.Earnings));
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "All earnings saved successfully!",
+                    Duration = 3000
+                });
+            allPlatformEarnings.Clear();
+            selectedContract = null;
+            currentStep = 0;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = $"Error saving earnings: {ex.Message}",
+                    Duration = 3000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private void OnCancel()
+    {
+        allPlatformEarnings.Clear();
+        selectedContract = null;
+        currentStep = 0;
+    }
+    public class PlatformEarningForm
+    {
+        public PlatformType Platform { get; set; }
+        public List<CreateEarningDto> Earnings { get; set; } = new();
+    }
+
+
+
+    private void OnContractChanged(object value)
+    {
+        if (value is Guid contractId)
+        {
+            selectedContractId = contractId;
+            selectedContract = contracts.FirstOrDefault(c => c.ContractId == contractId);
+
+            if (selectedContract != null)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Info,
+                        Summary = "Contract Selected",
+                        Detail = $"Contract for {selectedContract.DriverName} selected.",
+                        Duration = 2000
+                    });
+            }
+        }
+        StateHasChanged();
+    }
+
+
+
+
+}
+<style>
+    .contract-card {
+        cursor: pointer;
+        border: 1px solid var(--rz-base-200);
+        transition: all 0.2s ease-in-out;
+    }
+
+        .contract-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+    .selected-contract-card {
+        border: 2px solid var(--rz-primary);
+        background-color: var(--rz-primary-50);
+    }
+</style>

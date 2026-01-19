@@ -1,0 +1,411 @@
+﻿@page "/create-contract-dialog"
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.DtoModels.ContractDto
+@using CapManagement.Shared.DtoModels.DriverDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+@inject IContractServiceClient ContractClientService
+@inject IDriverSericeClient DriverClientService
+@inject ICarServiceClient CarClientService
+@inject NotificationService NotificationService
+
+
+
+
+<RadzenSteps Change="@OnChange" CanChange="@CanChange" @bind-SelectedIndex="currentStep" class="custom-stepper">
+    <Steps>
+        <!-- Step 1: Select Driver and Car -->
+        <RadzenStepsItem Text="Driver & Car">
+            <RadzenFieldset Text="Select Driver and Car">
+                <RadzenLabel Text="Driver" />
+                <RadzenDropDown @bind-Value="Contract.DriverId"
+                                Data="@Drivers"
+                                TextProperty="DriverName"
+                                ValueProperty="DriverId"
+                                Placeholder="Select driver"
+                                Style="width:100%"
+                                Disabled="@isLoading" />
+                <RadzenRequiredValidator Component="DriverId" Text="Driver is required" />
+                <RadzenLabel Text="Car" />
+                <RadzenDropDown @bind-Value="Contract.CarId"
+                                Data="@Cars"
+                                TextProperty="NumberPlate"
+                                ValueProperty="CarId"
+                                Placeholder="Select car"
+                                Style="width:100%"
+                                Disabled="@isLoading" />
+               @*  <RadzenDropDown @bind-Value="Contract.CarId"
+                                Data="@ActiveCars"
+                                TextProperty="NumberPlate"
+                                ValueProperty="CarId"
+                                Placeholder="Select car"
+                                AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                Style="width:100%"
+                                Disabled="@isLoading" /> *@
+                <RadzenRequiredValidator Component="CarId" Text="Car is required" />
+            </RadzenFieldset>
+        </RadzenStepsItem>
+        <!-- Step 2: Contract Details -->
+        <RadzenStepsItem Text="Details">
+            <RadzenFieldset Text="Contract Details">
+                <RadzenLabel Text="Start Date" />
+                <RadzenDatePicker @bind-Value="Contract.StartDate" Style="width:100%" />
+                <RadzenRequiredValidator Component="StartDate" Text="Start date is required" />
+                <RadzenLabel Text="End Date" />
+                <RadzenDatePicker @bind-Value="Contract.EndDate" Style="width:100%" AllowClear="true" />
+                <RadzenLabel Text="Status" />
+                <RadzenDropDown @bind-Value="Contract.Status"
+                                Data="@StatusOptions"
+                                TextProperty="Text"
+                                ValueProperty="Value"
+                                Style="width:100%" />
+                <RadzenLabel Text="Payment Amount" />
+                <RadzenNumeric @bind-Value="Contract.PaymentAmount"
+                               Placeholder="Enter payment amount"
+                               Style="width:100%" />
+                <RadzenLabel Text="Description" />
+                <RadzenTextBox @bind-Value="Contract.Description"
+                               Placeholder="Enter description"
+                               Style="width:100%" />
+                <RadzenLabel Text="Conditions" />
+                <RadzenTextArea @bind-Value="Contract.Conditions"
+                                Rows="4"
+                                Placeholder="Enter conditions"
+                                Style="width:100%" />
+            </RadzenFieldset>
+        </RadzenStepsItem>
+
+
+        <!-- Step 3: Upload PDF and Save -->
+        <RadzenStepsItem Text="Upload PDF">
+            <RadzenFieldset Text="Upload Contract PDF">
+                <RadzenUpload ChooseText="Select PDF"
+                              Accept=".pdf"
+                              Multiple="false"
+                              Change="@OnFileUpload"
+                              Disabled="@isLoading"
+                              Style="width:100%" />
+                @if (!isPdfUploaded)
+                {
+                    <span class="rz-text-danger">PDF file is required</span>
+                }
+                <div class="rz-mt-3">
+                    <RadzenButton Text="Save"
+                                  Icon="save"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Click="@OnSubmit"
+                                  Disabled="@isLoading" />
+                    <RadzenButton Text="Cancel"
+                                  Icon="close"
+                                  ButtonStyle="ButtonStyle.Light"
+                                  Click="@OnCancel"
+                                  Disabled="@isLoading" />
+                </div>
+            </RadzenFieldset>
+        </RadzenStepsItem>
+    </Steps>
+</RadzenSteps>
+@code {
+    [Parameter] public EventCallback<CreateContractDto> OnContractCreated { get; set; }
+
+
+    private List<CarDto> ActiveCars = new();
+
+    private CreateContractDto Contract = new();
+    private readonly Guid _companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189f3991b");
+    private List<DriverDto> Drivers = new();
+    private List<CarDto> Cars = new();
+    private bool isLoading;
+    private bool isPdfUploaded;
+    private int currentStep = 0;
+    private List<dynamic> StatusOptions = Enum.GetValues(typeof(ContractStatus))
+        .Cast<ContractStatus>()
+        .Select(s => new { Text = s.ToString(), Value = s })
+        .ToList<dynamic>();
+
+
+    private List<dynamic> ActiveStatusOptions = new() { new { Text = ContractStatus.Active.ToString(), Value = ContractStatus.Active } }; //  Only Active for creation
+
+
+
+    private Stream? uploadedPdfStream;
+    private string? uploadedFileName;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDriversAndCars();
+        Contract.Status = ContractStatus.Active;
+    }
+    private void OnChange()
+    {
+        // optional logic when changing steps
+    }
+    private async Task CanChange(StepsCanChangeEventArgs args)
+    {
+        // Allow going backward freely (no validation)
+        if (args.SelectedIndex < currentStep)
+        {
+            return;
+        }
+
+        // Validate before moving forward (only if trying to leave the current step)
+        if (args.SelectedIndex > currentStep)
+        {
+            switch (currentStep)
+            {
+                case 0:
+                    if (Contract.DriverId == Guid.Empty || Contract.CarId == Guid.Empty)
+                    {
+                        await DialogService.Alert("Please select both a Driver and a Car before continuing.", "Validation");
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+                case 1:
+                    if (Contract.StartDate == default ||
+                        Contract.Status == default ||
+                        Contract.PaymentAmount <= 0 ||
+                        string.IsNullOrWhiteSpace(Contract.Conditions))
+                    {
+                        await DialogService.Alert("Please complete all contract details before continuing.", "Validation");
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+                case 2:
+                    if (!isPdfUploaded)
+                    {
+                        await DialogService.Alert("Please upload the contract PDF before saving.", "Validation");
+                        args.PreventDefault();
+                        return;
+                    }
+                    break;
+            }
+        }
+        // If valid (or same step), do nothing—binding updates currentStep post-event
+    }
+
+
+
+    private async Task LoadDriversAndCars()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        try
+        {
+            var driverResult = await DriverClientService.GetDriversAsync(_companyId, 1, 100);
+            if (driverResult.Success)
+                Drivers = driverResult.Data?.Data ?? new List<DriverDto>();
+            var carResult = await CarClientService.GetCarsAsync(_companyId, 1, 100);
+            if (carResult.Success)
+                Cars = carResult.Data?.Data ?? new List<CarDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+    // private async Task OnFileUpload(UploadChangeEventArgs args)
+    // {
+    //     if (args.Files?.Any() != true)
+    //     {
+    //         await DialogService.Alert("Please select a PDF file to upload.");
+    //         return;
+    //     }
+    //     var file = args.Files.First();
+    //     if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+    //     {
+    //         await DialogService.Alert("Only PDF files are allowed.");
+    //         return;
+    //     }
+    //     using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB limit
+    //     using var memoryStream = new MemoryStream();
+    //     await stream.CopyToAsync(memoryStream);
+    //     Contract.PdfContent = memoryStream.ToArray();
+    //     isPdfUploaded = true;
+    //     NotificationService.Notify(new NotificationMessage
+    //         {
+    //             Severity = NotificationSeverity.Success,
+    //             Summary = "Upload Success",
+    //             Detail = $"PDF file '{file.Name}' uploaded successfully.",
+    //             Duration = 3000
+    //         });
+    // }
+    private async Task OnFileUpload(UploadChangeEventArgs args)
+    {
+        if (args.Files?.Any() != true)
+        {
+            await DialogService.Alert("Please select a PDF file to upload.");
+            return;
+        }
+
+        var file = args.Files.First();
+
+        if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            await DialogService.Alert("Only PDF files are allowed.");
+            return;
+        }
+
+        try
+        {
+            //  Open read-only stream once, max 10 MB
+            await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+
+            // Copy forward-only (no seeking)
+            await stream.CopyToAsync(memoryStream);
+
+            //  Assign to your DTO
+            Contract.PdfContent = memoryStream.ToArray();
+            isPdfUploaded = true;
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Upload Success",
+                    Detail = $"PDF file '{file.Name}' uploaded successfully.",
+                    Duration = 3000
+                });
+        }
+        catch (Exception ex)
+        {
+            await DialogService.Alert($"Error reading PDF file: {ex.Message}");
+        }
+    }
+
+    // private async Task OnSubmit()
+    // {
+    //     if (isLoading) return;
+
+    //     // Full validation before saving
+    //     if (Contract.DriverId == Guid.Empty || Contract.CarId == Guid.Empty)
+    //     {
+    //         await DialogService.Alert("Please select both a Driver and a Car.", "Validation");
+    //         return;
+    //     }
+    //     if (Contract.StartDate == default ||
+    //         Contract.Status == default ||
+    //         Contract.PaymentAmount <= 0 ||
+    //         string.IsNullOrWhiteSpace(Contract.Conditions))
+    //     {
+    //         await DialogService.Alert("Please complete all contract details.", "Validation");
+    //         return;
+    //     }
+    //     if (!isPdfUploaded)
+    //     {
+    //         await DialogService.Alert("Please upload the contract PDF.", "Validation");
+    //         return;
+    //     }
+
+    //     isLoading = true;
+    //     try
+    //     {
+    //         Contract.CompanyId = _companyId;
+
+    //         // ✅ Convert byte[] → Stream for uploading
+    //         using var pdfStream = new MemoryStream(Contract.PdfContent);
+    //         // var result = await ContractClientService.CreateContractAsync(Contract);
+    //         var result = await ContractClientService.CreateContractAsync(Contract, uploadedPdfStream);
+
+    //         if (result.Success)
+    //         {
+    //             await OnContractCreated.InvokeAsync(Contract);
+    //             NotificationService.Notify(new NotificationMessage
+    //                 {
+    //                     Severity = NotificationSeverity.Success,
+    //                     Summary = "Success",
+    //                     Detail = "Contract created successfully!",
+    //                     Duration = 3000
+    //                 });
+    //             DialogService.Close(true);
+    //         }
+    //         else
+    //         {
+    //             await DialogService.Alert(string.Join("; ", result.Errors ?? new List<string> { "Unknown error" }), "Error");
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         await DialogService.Alert($"Error creating contract: {ex.Message}", "Error");
+    //     }
+    //     finally
+    //     {
+    //         isLoading = false;
+    //     }
+    // }
+    private async Task OnSubmit()
+    {
+        if (isLoading) return;
+
+        // Full validation before saving
+        if (Contract.DriverId == Guid.Empty || Contract.CarId == Guid.Empty)
+        {
+            await DialogService.Alert("Please select both a Driver and a Car.", "Validation");
+            return;
+        }
+        if (Contract.StartDate == default ||
+            Contract.Status == default ||
+            Contract.PaymentAmount <= 0 ||
+            string.IsNullOrWhiteSpace(Contract.Conditions))
+        {
+            await DialogService.Alert("Please complete all contract details.", "Validation");
+            return;
+        }
+        if (!isPdfUploaded || Contract.PdfContent == null || Contract.PdfContent.Length == 0)
+        {
+            await DialogService.Alert("Please upload a valid contract PDF.", "Validation");
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            Contract.CompanyId = _companyId;
+
+            // ✅ Convert byte[] → Stream for uploading
+            using var pdfStream = new MemoryStream(Contract.PdfContent);
+            pdfStream.Position = 0; // Ensure the stream position is reset to the beginning
+            var result = await ContractClientService.CreateContractAsync(Contract, pdfStream);
+
+            if (result.Success)
+            {
+                await OnContractCreated.InvokeAsync(Contract);
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = "Contract created successfully!",
+                        Duration = 3000
+                    });
+                DialogService.Close(true);
+            }
+            else
+            {
+                await DialogService.Alert(string.Join("; ", result.Errors ?? new List<string> { "Unknown error" }), "Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            await DialogService.Alert($"Error creating contract: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private void OnCancel() => DialogService.Close(false);
+
+
+
+   
+}
+

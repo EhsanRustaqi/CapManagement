@@ -1,0 +1,42 @@
+﻿@using CapManagement.Shared.DtoModels.CompanyDtoModels
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+
+<RadzenTemplateForm TItem="CreateCompanyDto" Data="@company" Submit="@OnSubmit">
+    <ChildContent>
+        <RadzenFieldset Text="Create Company">
+            <RadzenTextBox @bind-Value="company.CompanyName" Name="CompanyName" Placeholder="Company Name" Style="width:100%" />
+            <RadzenTextBox @bind-Value="company.VATNumber" Name="VATNumber" Placeholder="VAT Number" Style="width:100%" />
+            <RadzenTextBox @bind-Value="company.Address" Name="Address" Placeholder="Address" Style="width:100%" />
+            <RadzenTextBox @bind-Value="company.CompanyEmail"
+                           Name="CompanyEmail"
+                           Placeholder="Company Email"
+                           Type="email"
+                           Style="width:100%" />
+
+            <RadzenRequiredValidator Text="Company email is required"
+                                     Component="CompanyEmail" />
+
+            <RadzenEmailValidator Text="Invalid email format"
+                                  Component="CompanyEmail" />
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" Type="Submit" />
+            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(args => DialogService.Close(false))" />
+        </RadzenFieldset>
+    </ChildContent>
+</RadzenTemplateForm>
+
+
+
+
+@code {
+    [Parameter] public EventCallback<CreateCompanyDto> OnCompanyCreated { get; set; }
+
+    private CreateCompanyDto company = new();
+
+    private async Task OnSubmit()
+    {
+        await OnCompanyCreated.InvokeAsync(company);
+        DialogService.Close(true);
+    }
+}

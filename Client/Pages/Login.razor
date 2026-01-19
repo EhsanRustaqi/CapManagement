@@ -1,0 +1,50 @@
+﻿@page "/login"
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.LoginDto
+@using Microsoft.AspNetCore.Authorization
+@using Radzen
+@using Radzen.Blazor
+
+@inject IAuthServiceClient AuthService
+@inject NavigationManager Navigation
+
+@attribute [AllowAnonymous]
+
+<RadzenCard class="rz-my-12 rz-mx-auto rz-p-4 rz-p-md-12" style="max-width: 600px;">
+    <h3 class="rz-text-center">Login</h3>
+
+    <RadzenTemplateForm Data="@request">
+        <RadzenLogin AllowRememberMe="true"
+                     AllowResetPassword="true"
+                     FormFieldVariant="Variant.Filled"
+                     Login="@OnLogin" />
+    </RadzenTemplateForm>
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <RadzenText Text="@error" Style="color:red; margin-top:10px;" />
+    }
+</RadzenCard>
+
+@code {
+    private LoginRequest request = new();
+    private string? error;
+
+    private async Task OnLogin(LoginArgs args)
+    {
+        error = null;
+
+        request.Email = args.Username;
+        request.Password = args.Password;
+
+        try
+        {
+            await AuthService.LoginAsync(request);
+            Navigation.NavigateTo("/");
+        }
+        catch
+        {
+            error = "Invalid email or password";
+        }
+    }
+}

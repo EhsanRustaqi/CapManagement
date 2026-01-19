@@ -1,0 +1,256 @@
+﻿@page "/view-contract-dialog"
+@inject IContractServiceClient ContractClientService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject ICarServiceClient CarClientService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.DtoModels.ContractDto
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width:100%; margin-bottom: 20px;" />
+}
+else if (Contract == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No Contract found with ID: @ContractId</RadzenText>
+        <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(false))" Style="margin-top: 10px;" />
+    </RadzenCard>
+}
+else
+{
+    <RadzenTemplateForm TItem="ContractDto" Data="@Contract" Submit="@UpdateContract" InvalidSubmit="@OnInvalidSubmit">
+        <RadzenFieldset Text="Edit Contract Details">
+            <RadzenStack Gap="1rem">
+
+                <!-- Brand -->
+                <RadzenFormField Text="DriverName" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Contract.DriverName" Name="DriverName" Style="width:100%" />
+                        <RadzenRequiredValidator Component="DriverName" Text="DriverName is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Car Selection (Dropdown) -->
+                <RadzenFormField Text="Car" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="Contract.CarId"
+                                        Data="@Cars"
+                                        TextProperty="Brand"
+                                        ValueProperty="CarId"
+                                        Name="CarId"
+                                        Style="width:100%"
+                                        Placeholder="Select a car" />
+                        <RadzenRequiredValidator Component="CarId" Text="Car is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Description -->
+                <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Contract.Description" Name="Description" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Description" Text="Description is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Start Date -->
+                <RadzenFormField Text="Start Date" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="Contract.StartDate" Name="StartDate" Style="width:100%" />
+                        <RadzenRequiredValidator Component="StartDate" Text="Start date is required" />
+                    </ChildContent>
+                </RadzenFormField>
+                <!-- End Date -->
+                <RadzenFormField Text="End Date" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDatePicker @bind-Value="Contract.EndDate" Name="EndDate" Style="width:100%" />
+                        <RadzenRequiredValidator Component="EndDate" Text="End date is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                <!-- Payment Amount -->
+                <RadzenFormField Text="Payment Amount" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="Contract.PaymentAmount" Name="PaymentAmount" Style="width:100%" />
+                        <RadzenRequiredValidator Component="PaymentAmount" Text="Payment amount is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                <!-- Description -->
+                <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Contract.Description" Name="Description" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                <!-- Conditions -->
+                <RadzenFormField Text="Conditions" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="Contract.Conditions" Name="Conditions" Style="width:100%" Rows="4" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <!-- Status -->
+                <!-- Status -->
+                <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="Contract.Status"
+                                        Data="Enum.GetValues<ContractStatus>()"
+                                        Name="Status"
+                                        Style="width:100%" />
+                        <RadzenRequiredValidator Component="Status" Text="Status is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+
+                <!-- Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" ButtonType="ButtonType.Submit" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(() => DialogService.Close(false))" />
+                </RadzenStack>
+
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public Guid ContractId { get; set; }
+    private List<CarDto> Cars = new();
+    private UpdateContractDto? updateContract;
+    private ContractDto? Contract;
+    private bool isLoading;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B"); // hardcoded for now
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ContractClientService.GetContractByIdAsync(ContractId, companyId);
+            if (result != null && result.Success)
+            {
+                Contract = result.Data;
+            }
+
+            await GetCarsAsync();   
+
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private async Task GetCarsAsync()
+    {
+        var carResult = await CarClientService.GetCarsAsync(companyId);
+
+        if (carResult != null && carResult.Success && carResult.Data != null)
+        {
+            // carResult is a PagedResponse<CarDto>
+            // so use carResult.Data, NOT carResult.ToListAsync()
+            Cars = carResult.Data.Data;
+        }
+        else
+        {
+            Cars = new List<CarDto>();
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Loading Cars",
+                    Detail = "Failed to load car list.",
+                    Duration = 4000
+                });
+        }
+    }
+
+   
+
+    private async Task UpdateContract()
+    {
+        if (Contract == null) return;
+
+        isLoading = true;
+        try
+        {
+            // ✅ Map the fields manually to the correct DTO
+            var updateDto = new UpdateContractDto
+                {
+                    ContractId = Contract.ContractId,
+                    CompanyId = companyId,
+                    DriverId = Contract.DriverId,
+                    CarId = Contract.CarId,
+                    StartDate = Contract.StartDate,
+                    EndDate = Contract.EndDate,
+                    Status = Contract.Status,
+                    PaymentAmount = Contract.PaymentAmount,
+                    Description = Contract.Description,
+                    Conditions = Contract.Conditions,
+                    
+                };
+
+            var result = await ContractClientService.UpdateContractAsync(updateDto);
+
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = "Contract updated successfully",
+                        Duration = 4000
+                    });
+
+                DialogService.Close(true);
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Update failed" };
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Updating Contract",
+                        Detail = string.Join("; ", errors),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Updating Contract",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 4000
+            });
+    }
+}
+}

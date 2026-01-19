@@ -1,0 +1,176 @@
+﻿@using Radzen
+@using Radzen.Blazor
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+
+<RadzenSidebarContainer>
+    <!-- Sidebar: Beautiful gradient with icons -->
+
+
+    <RadzenSidebar @bind-Expanded="@sidebarExpanded" 
+                   Mode="SidebarMode.Over" 
+                   Style="@sidebarStyle"
+                   class="rz-elevation-4">
+        <div class="sidebar-header rz-py-3 rz-px-4 rz-border-bottom-1 rz-border-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <RadzenIcon Icon="dashboard" Style="font-size: 2rem; margin-right: 1rem;" />
+            <RadzenLabel Text="CapManagement" class="rz-text-xl rz-font-bold" />
+        </div>
+      
+
+        <RadzenPanelMenu Style="background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); margin-top: 20px;"
+                         Multiple="false" 
+                         class="rz-text-white rz-py-2">
+
+
+            <AuthorizeView>
+                <Authorized>
+
+                    <RadzenPanelMenu>
+
+                        <RadzenPanelMenuItem Text="Home" Path="/" Icon="home" />
+
+                        <!-- Companies -->
+                        <RadzenPanelMenuItem Text="Companies" Icon="business">
+                            <RadzenPanelMenuItem Text="Company List" Path="companies" Icon="list" />
+                            <RadzenPanelMenuItem Text="Archived Companies" Path="archived-companies" Icon="archive" />
+                        </RadzenPanelMenuItem>
+
+                        <!-- Drivers -->
+                        <RadzenPanelMenuItem Text="Drivers" Icon="directions_car">
+                            <RadzenPanelMenuItem Text="Drivers List" Path="drivers" Icon="list" />
+                            <RadzenPanelMenuItem Text="Archived Drivers" Path="archived-driver" Icon="history" />
+                        </RadzenPanelMenuItem>
+
+                        <!-- Cars -->
+                        <RadzenPanelMenuItem Text="Cars" Icon="directions_bus">
+                            <RadzenPanelMenuItem Text="Cars List" Path="GetCar" Icon="list" />
+                            <RadzenPanelMenuItem Text="Archived Cars" Path="archived-car" Icon="archive" />
+                            <RadzenPanelMenuItem Text="Create Car" Path="Creat/car-rdw" Icon="add_circle" />
+                        </RadzenPanelMenuItem>
+
+                        <RadzenPanelMenuItem Text="Contracts" Icon="local_gas_station">
+                            <RadzenPanelMenuItem Text="Create Contract" Path="GetContract" Icon="add_circle" />
+                            <RadzenPanelMenuItem Text="Contract Archived" Path="Archive/Contract" Icon="list_alt" />
+  
+                        </RadzenPanelMenuItem>
+
+                        <!-- Settlements -->
+                        <RadzenPanelMenuItem Text="Settlements" Path="settlements" Icon="receipt" />
+
+                        <!-- Earnings -->
+                        <RadzenPanelMenuItem Text="Earnings" Icon="trending_up">
+                            <RadzenPanelMenuItem Text="Create Earning" Path="create-earning" Icon="add_circle" />
+                        </RadzenPanelMenuItem>
+
+                        <!-- Expenses -->
+                        <RadzenPanelMenuItem Text="Expenses" Icon="local_gas_station">
+                            <RadzenPanelMenuItem Text="Create Expense" Path="expenses/create" Icon="add_circle" />
+                            <RadzenPanelMenuItem Text="Expenses List" Path="GetExpenses" Icon="list_alt" />
+                            <RadzenPanelMenuItem Text="Archived Expenses" Path="GetArchivedExpenses" Icon="archive" />
+                        </RadzenPanelMenuItem>
+
+                    </RadzenPanelMenu>
+
+           @*  <RadzenPanelMenuItem Text="Home" Path="/" Icon="home" />
+            <RadzenPanelMenuItem Text="Company" Path="companies" Icon="business" />
+            <RadzenPanelMenuItem Text="Company Archive" Path="archived-companies" Icon="archive" />
+            <RadzenPanelMenuItem Text="Drivers" Path="drivers" Icon="directions_car" />
+            <RadzenPanelMenuItem Text="Archive Drivers" Path="archived-driver" Icon="history" />
+            <RadzenPanelMenuItem Text="Cars" Path="GetCar" Icon="directions_bus" />
+            <RadzenPanelMenuItem Text="ArchivedCars" Path=" archived-Car" Icon="directions_bus" />
+            <RadzenPanelMenuItem Text="Create Cars" Path="Creat/car-rdw" Icon="add_circle" />
+            <RadzenPanelMenuItem Text="Settlements" Path="settlements" Icon="receipt" />
+            <RadzenPanelMenuItem Text="Create Earning" Path="create-earning" Icon="trending_up" />
+            <RadzenPanelMenuItem Text="Car Expenses" Path="expenses/create" Icon="local_gas_station" />
+            <RadzenPanelMenuItem Text="Expenses List" Path="GetExpenses" Icon="list_alt" />
+            <RadzenPanelMenuItem Text="ArchivedExpenses" Path="GetArchivedExpenses" Icon="list_alt" /> *@
+
+                  
+        </Authorized>
+
+        <NotAuthorized>
+            <!-- OPTIONAL -->
+            <RadzenPanelMenuItem Text="Login" Path="/Login" Icon="login" />
+        </NotAuthorized>
+    </AuthorizeView>
+        
+        </RadzenPanelMenu>
+
+      
+
+
+    </RadzenSidebar>
+
+    <!-- Main Body: Dynamic content area -->
+    <RadzenBody>
+        <!-- Header: Sticky gradient top bar -->
+        <RadzenHeader>
+            <RadzenStack Orientation="Orientation.Horizontal"
+                         AlignItems="AlignItems.Center"
+                         Gap="1rem"
+                         class="rz-py-3 rz-px-4 rz-elevation-2"
+                         style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; position: sticky; top: 0; z-index: 1000;">
+                <RadzenSidebarToggle Click="@ToggleSidebar" 
+                                     Icon="menu" 
+                                     ButtonStyle="ButtonStyle.Text" 
+                                     style="background: rgba(255,255,255,0.1); border: none; color: white;" />
+                <RadzenIcon Icon="dashboard" Style="font-size: 1.5rem; margin-right: 0.5rem;" />
+                <RadzenLabel Text="CapManagement" class="rz-text-xl rz-font-bold" />
+                <div class="flex-grow"></div>
+                <!-- Add user profile, notifications, or search here -->
+            </RadzenStack>
+        </RadzenHeader>
+
+        <!-- Content: Adjusts dynamically with sidebar -->
+        <div class="content-wrapper rz-p-4 rz-flex-grow-1 rz-overflow-auto" style="@contentStyle">
+            @Body
+        </div>
+    </RadzenBody>
+</RadzenSidebarContainer>
+
+<style>
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .rz-panel-menu-item {
+        transition: all 0.2s ease;
+        border-radius: 8px;
+        margin: 0.29rem 0.5rem;
+    }
+
+    .rz-panel-menu-item:hover {
+        background: rgba(255,255,255,0.1);
+        transform: translateX(4px);
+    }
+
+    .rz-panel-menu-item.rz-state-active {
+        background: rgba(255,255,255,0.2);
+        color: #fff !important;
+    }
+
+    .content-wrapper {
+        background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+        min-height: calc(100vh - 80px);  /* Full height minus header */
+        transition: margin-left 0.3s ease;
+    }
+
+   
+   
+</style>
+
+@code {
+    private bool sidebarExpanded = true;
+    private string sidebarStyle => sidebarExpanded ? "width: 280px; transition: width 0.3s ease;" : "width: 70px; transition: width 0.3s ease;";
+    private string contentStyle => sidebarExpanded ? "margin-left: 280px;" : "margin-left: 70px;";
+
+    private void ToggleSidebar()
+    {
+        sidebarExpanded = !sidebarExpanded;
+        StateHasChanged();  // Force re-render for dynamic shift
+    }
+
+   
+}

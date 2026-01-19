@@ -1,0 +1,145 @@
+﻿@page "/view-company-dialog"
+@inject ICompanyServiceClient CompanyClientService
+@inject DialogService DialogService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.CompanyDtoModels
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+@inject DialogService DialogService
+
+@inject NotificationService NotificationService
+@if (isLoading)
+{
+    <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width:100%; margin-bottom: 20px;" />
+}
+else if (company == null)
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1">Error</RadzenText>
+        <RadzenText>No company found with ID: @CompanyId</RadzenText>
+        <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(false))" Style="margin-top: 10px;" />
+    </RadzenCard>
+}
+else
+{
+    <RadzenTemplateForm TItem="CompanyDto" Data="@company" Submit="@UpdateCompany" InvalidSubmit="@OnInvalidSubmit">
+        <RadzenFieldset Text="Edit Company Details">
+            <RadzenStack Gap="1rem">
+                <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="company.CompanyName" Name="CompanyName" Style="width:100%" />
+                        <RadzenRequiredValidator Component="CompanyName" Text="Company name is required" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="VAT Number" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="company.VATNumber" Name="VATNumber" Style="width:100%" />
+                        <RadzenRequiredValidator Component="VATNumber" Text="VAT number is required" />
+                    </ChildContent>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Email" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="company.CompanyEmail" Name="CompanyEmail" Style="width:100%" />
+                        <RadzenRequiredValidator Component="CompanyEmail" Text="CompanyEmail is required" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Address" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="company.Address" Name="Address" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Address" Text="Address is required" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenCheckBox @bind-Value="company.IsActive" Name="IsActive" />
+                        <RadzenLabel Text="@(company.IsActive ? "Active ✅" : "Archived ❌")" Style="margin-left: 8px;" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Save" Icon="save" ButtonType="ButtonType.Submit" />
+                    <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Icon="close" Click="@(() => DialogService.Close(false))" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    private CompanyDto? company;
+
+
+    private bool isLoading;
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await CompanyClientService.GetCompanyByIdAsync(CompanyId);
+        if (result != null && result.Success)
+        {
+            company = result.Data;
+        }
+    }
+
+
+    private async Task UpdateCompany()
+    {
+        if (company == null) return;
+
+        isLoading = true;
+        try
+        {
+            var result = await CompanyClientService.UpdateCompanyAsync(company);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Success",
+                        Detail = $"Company {company.CompanyName} updated successfully",
+                        Duration = 4000
+                    });
+                 DialogService.Close(true); // Signal success to parent
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Update failed" };
+                Console.WriteLine($"Update failed: {JsonSerializer.Serialize(errors)}");
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Updating Company",
+                        Detail = string.Join("; ", errors),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating company: {ex.Message}, StackTrace: {ex.StackTrace}");
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Updating Company",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Validation Error",
+                Detail = "Please fill in all required fields",
+                Duration = 4000
+            });
+    }
+}

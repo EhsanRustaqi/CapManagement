@@ -1,0 +1,47 @@
+﻿@using CapManagement.Client.ServiceClient.UserService
+@using Microsoft.AspNetCore.Components.Authorization
+@page "/"
+@inject CurrentUserService CurrentUserService
+
+<PageTitle>Index</PageTitle>
+
+@if (CurrentUserService.IsAuthenticated)
+{
+    <h1>Hello, @CurrentUserService.UserEmail!</h1>
+}
+else if (CurrentUserService.UserEmail != "Guest")
+{
+    <h1>Loading your profile...</h1> <!-- Or spinner -->
+}
+else
+{
+    <h1>Welcome, Guest! <em>Authenticating...</em></h1>
+}
+
+Welcome to your new app.
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+@* No more OnInitializedAsync or manual fetching! *@
+ 
+@* @inject AuthenticationStateProvider AuthStateProvider
+@page "/"
+<h1>Hello, @UserEmail!</h1>
+
+@code {
+    private string UserEmail = "Guest";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            UserEmail =
+                user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                ?? user.FindFirst("email")?.Value
+                ?? user.Identity.Name
+                ?? "User";
+        }
+    }
+} *@

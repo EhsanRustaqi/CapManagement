@@ -1,0 +1,178 @@
+﻿@page "/archived-Car"
+@inject ICarServiceClient CarClientService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Client.ServiceClient
+@using CapManagement.Shared.DtoModels.CarDtoModels
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using System.ComponentModel.Design
+
+<RadzenDataGrid @ref="companiesGrid" AllowFiltering="true" FilterPopupRenderMode="PopupRenderMode.OnDemand" AllowPaging="true" PageSize="5" AllowSorting="true"
+                Data="@Cars" Count="@totalCount" LoadData="@LoadData" TItem="CarDto">
+
+
+    <Columns>
+        <RadzenDataGridColumn Width="50px" Title="#" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+            <Template Context="data">
+                @(Cars.IndexOf(data) + ((pageNumber - 1) * pageSize) + 1)
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Property="Brand" Title="Brand" />
+        <RadzenDataGridColumn Property="Model" Title="Model" />
+        <RadzenDataGridColumn Property="NumberPlate" Title="NumberPlate" />
+        <RadzenDataGridColumn Property="Year" Title="Year" />
+        <RadzenDataGridColumn Property="Status" Title="Status" />
+        <RadzenDataGridColumn Width="160px" Title="Actions" Filterable="false" Sortable="false">
+            <Template Context="Car">
+                <RadzenButton Icon="refresh" Text="Restore" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                              Click="@(async args => await ConfirmRestore(Car.CarId, Car.Brand))" />
+            </Template>
+        </RadzenDataGridColumn>
+
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private RadzenDataGrid<CarDto>? companiesGrid;
+    private List<CarDto> Cars = new List<CarDto>(); // Changed to List<CarDto>
+    private int totalCount;
+    private int pageNumber = 1;
+    private int pageSize = 5;
+    private bool isLoading;
+    private bool isDisposed;
+
+    // Define your companyId here
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (isDisposed) return;
+
+        try
+        {
+            await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error on initialization: {ex.Message}, StackTrace: {ex.StackTrace}");
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Initialization Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        if (isDisposed || isLoading) return;
+
+        isLoading = true;
+        try
+        {
+            Console.WriteLine($"LoadData triggered: Skip={args.Skip}, Top={args.Top}, OrderBy={args.OrderBy}, Filter={args.Filter}");
+            if (args.Skip.HasValue && args.Top.HasValue && args.Top.Value > 0)
+            {
+                pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+                pageSize = args.Top.Value;
+            }
+            else
+            {
+                pageNumber = 1;
+                pageSize = 5;
+            }
+            Console.WriteLine($"Loading archived data: PageNumber={pageNumber}, PageSize={pageSize}");
+            var result = await CarClientService.GetArchivedCarsAsync(
+         companyId: companyId,
+         pageNumber: pageNumber,
+         pageSize: pageSize
+     );
+
+            if (result != null && result.Success)
+            {
+                Cars = result.Data?.Data ?? new List<CarDto>();
+                totalCount = result.Data?.TotalItems ?? 0;
+                // Console.WriteLine($"Loaded {Cars.Count} archived companies: {JsonSerializer.Serialize(Cars)}");
+                if (!isDisposed && companiesGrid != null)
+                {
+                    await companiesGrid.Reload();
+                }
+            }
+            else
+            {
+                var errors = result?.Errors ?? new List<string> { "Result is null" };
+                Console.WriteLine($"Failed to load archived data: {JsonSerializer.Serialize(errors)}");
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Loading Archived Car",
+                        Detail = string.Join("; ", errors),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading archived data: {ex.Message}, StackTrace: {ex.StackTrace}");
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error Loading Archived Companies",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmRestore(Guid CarId, string CarName)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to restore '{CarName}'?",
+            "Confirm Restore",
+            new ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No" }
+        );
+
+        if (confirmed == true)
+        {
+            var result = await CarClientService.RestoreCarAsync(CarId, companyId);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Car Restored",
+                        Detail = $"'{CarName}' has been restored successfully.",
+                        Duration = 4000
+                    });
+
+                // Refresh archived list
+                await LoadData(new LoadDataArgs { Skip = (pageNumber - 1) * pageSize, Top = pageSize });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Restore Failed",
+                        Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+
+
+
+}
