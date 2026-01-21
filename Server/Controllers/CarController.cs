@@ -41,16 +41,16 @@ namespace CapManagement.Server.Controllers
             var response = await _carService.CreateCarAsync(carDto, Guid.NewGuid().ToString());
 
             if (!response.Success)
-            {
+            
                 return BadRequest(response); // Already an ApiResponse<CarDto>
-            }
-
+            
+            return Ok(response);
             // Correct CreatedAtAction call pointing to GET by ID
-            return CreatedAtAction(
-                nameof(GetCarByIdAsync),                 // GET action for the car
-                new { id = response.Data.CarId, companyId = response.Data.CompanyId },  // route + query params
-                response
-            );
+            //return CreatedAtAction(
+            //    nameof(GetCarByIdAsync),                 // GET action for the car
+            //    new { id = response.Data.CarId, companyId = response.Data.CompanyId },  // route + query params
+            //    response
+            //);
         }
 
         // GET: api/Car
@@ -117,10 +117,33 @@ namespace CapManagement.Server.Controllers
             var response = await _carService.ArchiveCarAsync(id, companyId);
 
             if (!response.Success)
-                return NotFound(response);
+                return BadRequest(response); // Already an ApiResponse<CarDto>
 
-            return Ok(new { Message = "Car archived successfully." });
+            return Ok(response);
         }
+
+
+
+        [HttpGet("available-for-contract/{companyId}")]
+        public async Task<IActionResult> GetCarsWithoutActiveContract(Guid companyId)
+        {
+            var response = await _carService.GetCArsWithoutActiveContractAsync(companyId);
+
+            if (!response.Success)
+            {
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+
+
+
+
+
+
+
 
         // PATCH: api/Car/{id}/restore
         [HttpPatch("{carId}/restore")]

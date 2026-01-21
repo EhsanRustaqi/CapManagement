@@ -100,7 +100,7 @@ namespace CapManagement.Server.Repository
             var query = _context.Contracts
                 .Where(c => c.CompanyId == companyId && c.IsActive)
                 .Include(c => c.Driver)
-    .Include(c => c.Car)
+                .Include(c => c.Car)
                 .AsNoTracking();
 
             // ✅ Properly structured: Include Car/Driver if needed for filter or orderBy

@@ -1,0 +1,9 @@
+﻿<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
+    <span style="font-weight:600; color:#555;">@Label</span>
+    <span style="color:#000;">@(string.IsNullOrWhiteSpace(Value) ? "-" : Value)</span>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Value { get; set; }
+}

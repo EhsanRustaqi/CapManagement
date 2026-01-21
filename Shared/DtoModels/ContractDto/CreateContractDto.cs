@@ -23,6 +23,10 @@ namespace CapManagement.Shared.DtoModels.ContractDto
         [JsonPropertyName("carId")]
         public Guid CarId { get; set; }
 
+        public string CarName { get; set; }
+
+        public string DriverName {  get; set; }
+
         [Required]
         [JsonPropertyName("startDate")]
         public DateTime StartDate { get; set; }

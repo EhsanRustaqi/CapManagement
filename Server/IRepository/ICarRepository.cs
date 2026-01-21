@@ -29,5 +29,8 @@ namespace CapManagement.Server.IRepository
         Task<Car?> GetCarBasicInfoAsync(Guid carId, Guid companyId);
 
         Task<Car?> GetCarWithContractsAsync(Guid carId, Guid companyId);
+
+
+        Task<List<Car>> GetCArsWithoutActiveContractAsync( Guid companyId);
     }
 }

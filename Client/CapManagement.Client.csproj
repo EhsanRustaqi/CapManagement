@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Pages\Car\DetailRow.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="7.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="7.0.18" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="7.0.18" PrivateAssets="all" />
@@ -20,6 +24,18 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared\CapManagement.Shared.csproj" />
 
+  </ItemGroup>
+
+  <ItemGroup>
+    <UpToDateCheckInput Remove="Pages\Car\DetailRow.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <_ContentIncludedByDefault Remove="Pages\Car\DetailRow.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Pages\Car\DetailRow.razor" />
   </ItemGroup>
 
 </Project>

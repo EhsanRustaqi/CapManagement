@@ -216,6 +216,7 @@ namespace CapManagement.Server.Services
                     DriverId = c.DriverId,
                     DriverName = c.Driver != null ? c.Driver.DriverName : string.Empty,
                     CarId = c.CarId,
+                    CarName = c.Car != null ? c.Car.Brand : string.Empty,
                     StartDate = c.StartDate,
                     EndDate = c.EndDate,
                     Status = c.Status,               // ContractStatus

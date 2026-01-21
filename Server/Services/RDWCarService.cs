@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+﻿using System.Globalization;
+using System.Net.Http;
 using System.Text.Json;
 using CapManagement.Shared.DtoModels.CarDtoModels;
 using CapManagement.Shared.Models;
@@ -60,27 +61,31 @@ public class RdwCarService
             NumberOfSeats = rdw.aantal_zitplaatsen ?? string.Empty,
             EngineCapacity = rdw.cilinderinhoud ?? string.Empty,
             EmptyWeight = rdw.massa_ledig_voertuig ?? string.Empty,
-            ApkExpirationDate = rdw.vervaldatum_apk ?? string.Empty,
+            ApkExpirationDate = TryParseRdwDate(rdw.vervaldatum_apk),
+
             Year = TryParseYear(rdw.datum_eerste_toelating)
         };
 
         return car;
     }
 
-    //// 🔹 Helper methods (MUST be inside the class, below main methods)
-    //private static int? TryParseNullableInt(string? value)
-    //{
-    //    if (int.TryParse(value, out var result))
-    //        return result;
-    //    return null;
-    //}
+    private DateTime? TryParseRdwDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
 
-    //private static DateTime? TryParseDate(string? value)
-    //{
-    //    if (DateTime.TryParse(value, out var date))
-    //        return date;
-    //    return null;
-    //}
+        if (DateTime.TryParseExact(
+            value,
+            "yyyyMMdd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var result))
+        {
+            return result;
+        }
+
+        return null;
+    }
 
     private static int TryParseYear(string? dateValue)
     {

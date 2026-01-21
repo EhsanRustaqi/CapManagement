@@ -36,10 +36,10 @@
             </Template>
         </RadzenDataGridColumn>
 
-        <RadzenDataGridColumn Property="ContractId" Title="Contract ID" />
-        <RadzenDataGridColumn Property="CompanyId" Title="Company ID" />
+       @*  <RadzenDataGridColumn Property="ContractId" Title="Contract ID" />
+        <RadzenDataGridColumn Property="CompanyId" Title="Company ID" /> *@
         <RadzenDataGridColumn Property="DriverName" Title="Driver ID" />
-        <RadzenDataGridColumn Property="CarId" Title="Car ID" />
+        <RadzenDataGridColumn Property="CarName" Title=" CarName" />
         <RadzenDataGridColumn Property="StartDate" Title="Start Date" FormatString="{0:yyyy-MM-dd}" />
         <RadzenDataGridColumn Property="EndDate" Title="End Date" FormatString="{0:yyyy-MM-dd}" />
         <RadzenDataGridColumn Property="Status" Title="Status" />
@@ -53,7 +53,7 @@
                               Click="@(async () => await DownloadPdfAsync(data.ContractId))"
                                 Size="ButtonSize.Small"/>
 
-                <RadzenButton Text="View" Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                <RadzenButton  Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
                               Click="@(args => DialogService.OpenAsync<ViewContractDialog>(
           "Contract Details",
           new Dictionary<string, object>() { { "ContractId", data.ContractId } },
@@ -63,7 +63,7 @@
 
 
                 <RadzenButton Icon="archive"
-                              Text="Archive"
+                              
                               ButtonStyle="ButtonStyle.Danger"
                               Size="ButtonSize.Small"
                               Click="@(() => ConfirmArchive(data.ContractId, data.CompanyId))" />

@@ -4,7 +4,7 @@
 @using CapManagement.Client.ServiceClient
 @using Radzen
 @using Radzen.Blazor
-
+@inject NavigationManager NavigationManager
 @inject ICarServiceClient CarServiceClient
 @inject NotificationService NotificationService
 <RadzenHeading Size="H3" Text="Fetch Car Information (RDW API)" class="mb-4 text-primary" />
@@ -55,7 +55,13 @@
                     <p><b>Weight (kg):</b> @fetchedCar.EmptyWeight</p>
                     <p>
                         <b>APK Expiry:</b>
-                    <p><b>APK Expiry:</b> @(string.IsNullOrWhiteSpace(fetchedCar.ApkExpirationDate) ? "N/A" : fetchedCar.ApkExpirationDate)</p>
+                    <p>
+                        <b>APK Expiry:</b>
+                            @(fetchedCar.ApkExpirationDate.HasValue
+                                ? fetchedCar.ApkExpirationDate.Value.ToString("yyyy-MM-dd HH:mm")
+                                : "N/A")
+                    </p>
+
 
                     </p>
                 </RadzenCard>
@@ -138,7 +144,10 @@
                 NumberOfSeats = fetchedCar.NumberOfSeats,
                 EngineCapacity = fetchedCar.EngineCapacity,
                 EmptyWeight = fetchedCar.EmptyWeight,
-                ApkExpirationDate = fetchedCar.ApkExpirationDate,
+                ApkExpirationDate = fetchedCar.ApkExpirationDate.HasValue
+        ? fetchedCar.ApkExpirationDate.Value.ToString("yyyyMMdd")
+        : null,
+
                 CompanyId = _companyId,
                
             };
@@ -149,6 +158,11 @@
         if (result.Success)
         {
             NotificationService.Notify(NotificationSeverity.Success, "Car Created", $"Car {createDto.Brand} {createDto.Model} successfully added!");
+
+            await Task.Delay(1500);  // 1.5s—tune as needed (500-2000ms)
+
+            NavigationManager.NavigateTo("/GetCar", forceLoad: true);
+            return;
         }
         else
         {

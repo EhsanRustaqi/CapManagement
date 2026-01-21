@@ -23,5 +23,8 @@ namespace CapManagement.Client.IServiceClient
 
         Task<CarDto?> GetCarInfoFromRdwAsync(string numberPlate);
 
+
+        Task<ApiResponse<List<CarDto>>> GetAvailableCarsForContractAsync(Guid companyId);
+
     }
 }

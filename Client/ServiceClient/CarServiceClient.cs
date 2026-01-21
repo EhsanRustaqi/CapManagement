@@ -172,6 +172,64 @@ namespace CapManagement.Client.ServiceClient
             }
         }
 
+
+
+
+
+        public async Task<ApiResponse<List<CarDto>>> GetAvailableCarsForContractAsync(Guid companyId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"api/Car/available-for-contract/{companyId}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"API Error: Status={response.StatusCode}, Content={errorContent}");
+
+                    return new ApiResponse<List<CarDto>>
+                    {
+                        Success = false,
+                        Errors = new List<string>
+                {
+                    $"Server returned {response.StatusCode}: {errorContent}"
+                }
+                    };
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<CarDto>>>();
+
+                if (result == null)
+                {
+                    Console.WriteLine("Deserialization returned null");
+
+                    return new ApiResponse<List<CarDto>>
+                    {
+                        Success = false,
+                        Errors = new List<string>
+                {
+                    "Empty or invalid response from server."
+                }
+                    };
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"HTTP Exception in GetAvailableCarsForContractAsync: {ex}");
+
+                return new ApiResponse<List<CarDto>>
+                {
+                    Success = false,
+                    Errors = new List<string>
+            {
+                $"Unexpected error while loading available cars: {ex.Message}"
+            }
+                };
+            }
+        }
+
         public async Task<ApiResponse<CarDto>> GetCarByIdAsync(Guid CarId, Guid companyId)
         {
             var response = await _httpClient.GetAsync($"api/Car/{CarId}?companyId={companyId}");

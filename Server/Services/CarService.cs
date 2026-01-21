@@ -7,6 +7,8 @@ using CapManagement.Shared.DtoModels.CarDtoModels;
 using CapManagement.Shared.DtoModels.DriverDtoModels;
 using CapManagement.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Globalization;
 
 namespace CapManagement.Server.Services
 {
@@ -116,6 +118,7 @@ namespace CapManagement.Server.Services
                     NumberOfSeats = TryParseNullableInt(carDto.NumberOfSeats),
                     EngineCapacity = TryParseNullableInt(carDto.EngineCapacity),
                     EmptyWeight = TryParseNullableInt(carDto.EmptyWeight),
+                    //ApkExpirationDate = TryParseNullableDate(carDto.ApkExpirationDate),
                     ApkExpirationDate = TryParseNullableDate(carDto.ApkExpirationDate),
                     CreatedAt = DateTime.UtcNow
                 };
@@ -132,14 +135,14 @@ namespace CapManagement.Server.Services
                     NumberPlate = car.NumberPlate,
                     CompanyId = car.CompanyId,
                     Status = car.Status,
-                      Color = carDto.Color,
-                    VehicleType = carDto.VehicleType,
-                    FuelType = carDto.FuelType,
-                    NumberOfDoors = carDto.NumberOfDoors,
-                    NumberOfSeats = carDto.NumberOfSeats,
-                    EngineCapacity = carDto.EngineCapacity,
-                    EmptyWeight = carDto.EmptyWeight,
-                    ApkExpirationDate = carDto.ApkExpirationDate,
+                      Color = car.Color,
+                    VehicleType = car.VehicleType,
+                    FuelType = car.FuelType,
+                    NumberOfDoors = car.NumberOfDoors.ToString(),
+                    NumberOfSeats = car.NumberOfSeats.ToString(),
+                    EngineCapacity = car.EngineCapacity.ToString(),
+                    EmptyWeight = car.EmptyWeight.ToString(),
+                    ApkExpirationDate = car.ApkExpirationDate,
 
                 };
 
@@ -169,6 +172,25 @@ namespace CapManagement.Server.Services
             }
         }
 
+        // below method is parsing apk date that should be converted to string
+        private DateTime? TryParseNullableDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            if (DateTime.TryParseExact(
+                value,
+                "yyyyMMdd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var result))
+            {
+                return result;
+            }
+
+            return null;
+        }
+
 
 
         private int? TryParseNullableInt(string? value)
@@ -176,10 +198,10 @@ namespace CapManagement.Server.Services
             return int.TryParse(value, out var result) ? result : null;
         }
 
-        private DateTime? TryParseNullableDate(string? value)
-        {
-            return DateTime.TryParse(value, out var date) ? date : null;
-        }
+        //private DateTime? TryParseNullableDate(string? value)
+        //{
+        //    return DateTime.TryParse(value, out var date) ? date : null;
+        //}
 
 
         // submethod for validating only the cars which are has validated value
@@ -275,7 +297,8 @@ namespace CapManagement.Server.Services
                     NumberOfSeats = c.NumberOfSeats?.ToString() ?? string.Empty,
                     EngineCapacity = c.EngineCapacity?.ToString() ?? string.Empty,
                     EmptyWeight = c.EmptyWeight?.ToString() ?? string.Empty,
-                    ApkExpirationDate = c.ApkExpirationDate?.ToString("dd MMM yyyy") ?? string.Empty,
+                    //ApkExpirationDate = c.ApkExpirationDate?.ToString("dd MMM yyyy") ?? string.Empty,
+                    ApkExpirationDate = c.ApkExpirationDate,
                     //FirstRegistrationDate = c.FirstRegistrationDate?.ToString("dd MMM yyyy") ?? string.Empty
                 }).ToList(),
                 PageNumber = pagedResult.PageNumber,
@@ -377,7 +400,18 @@ namespace CapManagement.Server.Services
                 NumberPlate = car.NumberPlate,
                 Year = car.Year,
                 Status = car.Status,          // ✅ CarStatus enum
-                CompanyId = car.CompanyId
+                CompanyId = car.CompanyId,
+                Color = car.Color,
+                // ✅ RDW fields (converted to strings)
+
+                VehicleType = car.VehicleType ?? string.Empty,
+                FuelType = car.FuelType ?? string.Empty,
+                NumberOfDoors = car.NumberOfDoors?.ToString() ?? string.Empty,
+                NumberOfSeats = car.NumberOfSeats?.ToString() ?? string.Empty,
+                EngineCapacity = car.EngineCapacity?.ToString() ?? string.Empty,
+                EmptyWeight = car.EmptyWeight?.ToString() ?? string.Empty,
+                ApkExpirationDate = car.ApkExpirationDate
+
             };
 
             }
@@ -501,6 +535,59 @@ namespace CapManagement.Server.Services
                 response.Success = false;
                 response.Errors = new List<string> { $"Unexpected error: {ex.Message}" };
                 return response;
+            }
+        }
+
+        public async Task<ApiResponse<List<CarDto>>> GetCArsWithoutActiveContractAsync(Guid companyId)
+        {
+            try
+            {
+                var cars = await _carRepository.GetCArsWithoutActiveContractAsync(companyId);
+
+                if (cars == null || !cars.Any())
+                {
+                    return new ApiResponse<List<CarDto>>
+                    {
+                        Success = true,
+                        Data = new List<CarDto>()   // empty list is OK
+                    };
+                }
+
+                // Map entity -> DTO
+                var result = cars.Select(c => new CarDto
+                {
+                    CarId = c.CarId,
+                    Brand = c.Brand,
+                    Model = c.Model,
+                    NumberPlate = c.NumberPlate,
+                    Year = c.Year,
+                    Status = c.Status,
+                    CompanyId = c.CompanyId,
+
+                    // RDW fields (if you want to show them later)
+                    Color = c.Color,
+                    VehicleType = c.VehicleType,
+                    FuelType = c.FuelType,
+                    NumberOfDoors = c.NumberOfDoors?.ToString(),
+                    NumberOfSeats = c.NumberOfSeats?.ToString(),
+                    EngineCapacity = c.EngineCapacity?.ToString(),
+                    EmptyWeight = c.EmptyWeight?.ToString(),
+                    ApkExpirationDate = c.ApkExpirationDate
+                }).ToList();
+
+                return new ApiResponse<List<CarDto>>
+                {
+                    Success = true,
+                    Data = result
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<List<CarDto>>
+                {
+                    Success = false,
+                    Errors = new List<string> { $"Failed to load available cars: {ex.Message}" }
+                };
             }
         }
     }

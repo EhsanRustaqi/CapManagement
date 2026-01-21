@@ -25,7 +25,7 @@ namespace CapManagement.Server.IService
         Task<ApiResponse<PagedResponse<CarDto>>> GetArchivedCarsAsync(int pageNumber, int pageSize, Guid companyId);
 
 
-     
+        Task<ApiResponse<List<CarDto>>> GetCArsWithoutActiveContractAsync(Guid companyId);
 
     }
 }

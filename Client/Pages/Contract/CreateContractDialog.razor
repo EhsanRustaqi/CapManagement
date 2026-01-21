@@ -32,11 +32,30 @@
                 <RadzenLabel Text="Car" />
                 <RadzenDropDown @bind-Value="Contract.CarId"
                                 Data="@Cars"
-                                TextProperty="NumberPlate"
                                 ValueProperty="CarId"
-                                Placeholder="Select car"
+                                Placeholder="Select available car"
                                 Style="width:100%"
-                                Disabled="@isLoading" />
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
+
+                    <!-- How each item in the list looks -->
+                    <Template Context="car">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span><b>@car.NumberPlate</b></span>
+                            <span style="color:#666;">@car.Brand @car.Model</span>
+                        </div>
+                    </Template>
+
+                    <!-- How the selected value looks in the closed dropdown -->
+                    <ValueTemplate Context="car">
+                        <span>
+                            <b>@car.NumberPlate</b> — @car.Brand @car.Model
+                        </span>
+                    </ValueTemplate>
+
+                </RadzenDropDown>
+
+
                @*  <RadzenDropDown @bind-Value="Contract.CarId"
                                 Data="@ActiveCars"
                                 TextProperty="NumberPlate"
@@ -202,9 +221,16 @@
             var driverResult = await DriverClientService.GetDriversAsync(_companyId, 1, 100);
             if (driverResult.Success)
                 Drivers = driverResult.Data?.Data ?? new List<DriverDto>();
-            var carResult = await CarClientService.GetCarsAsync(_companyId, 1, 100);
+            // var carResult = await CarClientService.GetCarsAsync(_companyId, 1, 100);
+            // if (carResult.Success)
+            //     Cars = carResult.Data?.Data ?? new List<CarDto>();
+
+            var carResult = await CarClientService.GetAvailableCarsForContractAsync(_companyId);
+
             if (carResult.Success)
-                Cars = carResult.Data?.Data ?? new List<CarDto>();
+            {
+                Cars = carResult.Data ?? new List<CarDto>();
+            }
         }
         finally
         {

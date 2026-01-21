@@ -11,8 +11,8 @@
 @using System.Text.Json
 
 
-<RadzenButton Text="Add Car" Icon="add_circle" ButtonStyle="ButtonStyle.Primary"
-              Click="@(async args => await OpenCreateDialog())" Style="margin-top:20px" />
+@* <RadzenButton Text="Add Car" Icon="add_circle" ButtonStyle="ButtonStyle.Primary"
+              Click="@(async args => await OpenCreateDialog())" Style="margin-top:20px" /> *@
 
 @* <RadzenDataGrid @ref="CarsGrid" AllowFiltering="true" FilterPopupRenderMode="PopupRenderMode.OnDemand"
                 AllowPaging="true" PageSize="5" AllowSorting="true"
@@ -38,29 +38,38 @@
                 @(Cars.IndexOf(data) + ((pageNumber - 1) * pageSize) + 1)
             </Template>
         </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="NumberPlate" Title="NumberPlate" />
         <RadzenDataGridColumn Property="Brand" Title="Brand" />
         <RadzenDataGridColumn Property="Model" Title="Model" />
-        <RadzenDataGridColumn Property="NumberPlate" Title="NumberPlate" />
         <RadzenDataGridColumn Property="Year" Title="Year" />
         <RadzenDataGridColumn TItem="CarDto" Property="Color" Title="Color" />
         <RadzenDataGridColumn TItem="CarDto" Property="VehicleType" Title="Vehicle Type" />
-        <RadzenDataGridColumn TItem="CarDto" Property="FuelType" Title="Fuel Type" />
+  @*       <RadzenDataGridColumn TItem="CarDto" Property="FuelType" Title="Fuel Type" />
         <RadzenDataGridColumn TItem="CarDto" Property="NumberOfDoors" Title="Doors" />
         <RadzenDataGridColumn TItem="CarDto" Property="NumberOfSeats" Title="Seats" />
         <RadzenDataGridColumn TItem="CarDto" Property="EngineCapacity" Title="Engine (cc)" />
-        <RadzenDataGridColumn TItem="CarDto" Property="EmptyWeight" Title="Weight (kg)" />
-        <RadzenDataGridColumn TItem="CarDto" Property="ApkExpirationDate" Title="APK Expiry" />
+        <RadzenDataGridColumn TItem="CarDto" Property="EmptyWeight" Title="Weight (kg)" /> *@
+     @*    <RadzenDataGridColumn TItem="CarDto" Property="ApkExpirationDate" Title="APK Expiry" /> *@
+        <RadzenDataGridColumn TItem="CarDto" Property="ApkExpirationDate" Title="APK Expiry">
+            <Template Context="data">
+                <span>@data.ApkExpirationDate</span>
+            </Template>
+        </RadzenDataGridColumn>
+
+
+
         <RadzenDataGridColumn Property="Status" Title="Status"  />
       
         <RadzenDataGridColumn Width="160px" Title="Actions" Filterable="false" Sortable="false">
             <Template Context="Car">
 
 
-                <RadzenButton Text="View" Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
                               Click="@(args => DialogService.OpenAsync<ViewCarDialog>(
           "Car Details",
           new Dictionary<string, object>() { { "CarId", Car.CarId } },
-          new DialogOptions() { Width = "600px", Height = "500px" }))" />
+          new DialogOptions() { Width = "1000px", Height = "600px" }))" />
 
 
                        @*         <RadzenButton Icon="edit" Text="Edit" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
@@ -68,7 +77,7 @@
 
 
 
-                <RadzenButton Icon="archive" Text="Archive" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                <RadzenButton Icon="archive"  ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
                               Click="@(() => ConfirmArchive(Car.CarId, Car.Brand))" />
             </Template> 
         </RadzenDataGridColumn>
@@ -236,16 +245,38 @@
 
 
 
+    // private async Task OpenCreateDialog()
+    // {
+    //     var result = await DialogService.OpenAsync<CreateCarDialog>(
+    //         "Create Car", // <-- fixed title
+    //         new Dictionary<string, object>
+    //             {
+    //         { "OnCarCreated", EventCallback.Factory.Create<CreateCarDto>(this, CreateCar) } // <-- fixed type + prop name
+    //             },
+    //         new DialogOptions() { Width = "1000px", Height = "700px", Resizable = true, Draggable = true });
+
+    // }
     private async Task OpenCreateDialog()
     {
         var result = await DialogService.OpenAsync<CreateCarDialog>(
-            "Create Car", // <-- fixed title
+            "Create Car",
             new Dictionary<string, object>
                 {
-            { "OnCarCreated", EventCallback.Factory.Create<CreateCarDto>(this, CreateCar) } // <-- fixed type + prop name
+            { "OnCarCreated", EventCallback.Factory.Create<CreateCarDto>(this, CreateCar) }
                 },
-            new DialogOptions() { Width = "600px", Height = "400px", Resizable = true, Draggable = true });
+            new DialogOptions()
+                {
+                    Width = "1000vw",
+                    Height = "100vh",
+                    Resizable = false,
+                    Draggable = false,
+                    ShowClose = true,
+                    CloseDialogOnOverlayClick = false
+                });
     }
+
+
+
 
     private async Task CreateCar(CreateCarDto newCar)
     {

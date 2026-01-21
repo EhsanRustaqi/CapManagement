@@ -66,7 +66,7 @@ namespace CapManagement.Shared.DtoModels.CarDtoModels
         public string? EmptyWeight { get; set; }
 
         [JsonPropertyName("apkExpirationDate")]
-        public string? ApkExpirationDate { get; set; }
+        public DateTime? ApkExpirationDate { get; set; }
 
 
 

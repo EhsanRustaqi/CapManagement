@@ -229,6 +229,21 @@ public async Task<PageResult<Car>> GetAllCarAsync(int pageNumber, int pageSize, 
                 );
         }
 
+
+
+
+
+
+
+        public async Task<List<Car>> GetCArsWithoutActiveContractAsync(Guid companyId)
+        {
+            return await _context.Cars
+                .Where(c => c.CompanyId == companyId)
+                .Where(c => !_context.Contracts
+                .Any(ct => ct.CarId == c.CarId && ct.Status == ContractStatus.Active))
+                .ToListAsync();
+        }
+
         public async Task<Car?> GetCarWithContractsAsync(Guid carId, Guid companyId)
         {
             return await _context.Cars
@@ -311,6 +326,10 @@ public async Task<PageResult<Car>> GetAllCarAsync(int pageNumber, int pageSize, 
             _context.Cars.Update(existing);
             return await _context.SaveChangesAsync() > 0;
         }
+
+
+
+
 
     }
 }
