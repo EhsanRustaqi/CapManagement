@@ -98,7 +98,7 @@ namespace CapManagement.Server.Repository
 
 
             var query = _context.Contracts
-                .Where(c => c.CompanyId == companyId && c.IsActive)
+                .Where(c => c.CompanyId == companyId && c.IsActive && c.Status == ContractStatus.Active)
                 .Include(c => c.Driver)
                 .Include(c => c.Car)
                 .AsNoTracking();

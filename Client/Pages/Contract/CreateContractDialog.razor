@@ -38,6 +38,8 @@
                                 AllowFiltering="true"
                                 FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
 
+
+
                     <!-- How each item in the list looks -->
                     <Template Context="car">
                         <div style="display:flex; justify-content:space-between;">
@@ -77,20 +79,31 @@
                 <RadzenRequiredValidator Component="StartDate" Text="Start date is required" />
                 <RadzenLabel Text="End Date" />
                 <RadzenDatePicker @bind-Value="Contract.EndDate" Style="width:100%" AllowClear="true" />
-                <RadzenLabel Text="Status" />
+                
+                
+              @*   <RadzenLabel Text="Status" />
                 <RadzenDropDown @bind-Value="Contract.Status"
                                 Data="@StatusOptions"
                                 TextProperty="Text"
                                 ValueProperty="Value"
-                                Style="width:100%" />
+                                Style="width:100%" /> *@
+                <RadzenLabel Text="Status" />
+                <RadzenTextBox Value="Active" Disabled="true" Style="width:100%" />
+
+
                 <RadzenLabel Text="Payment Amount" />
                 <RadzenNumeric @bind-Value="Contract.PaymentAmount"
                                Placeholder="Enter payment amount"
                                Style="width:100%" />
+
+
                 <RadzenLabel Text="Description" />
                 <RadzenTextBox @bind-Value="Contract.Description"
                                Placeholder="Enter description"
                                Style="width:100%" />
+
+
+
                 <RadzenLabel Text="Conditions" />
                 <RadzenTextArea @bind-Value="Contract.Conditions"
                                 Rows="4"
@@ -142,6 +155,9 @@
     private bool isLoading;
     private bool isPdfUploaded;
     private int currentStep = 0;
+
+
+
     private List<dynamic> StatusOptions = Enum.GetValues(typeof(ContractStatus))
         .Cast<ContractStatus>()
         .Select(s => new { Text = s.ToString(), Value = s })

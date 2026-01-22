@@ -7,6 +7,7 @@ using CapManagement.Shared.DtoModels.ContractDto;
 using CapManagement.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Data;
 namespace CapManagement.Server.Services
@@ -216,7 +217,19 @@ namespace CapManagement.Server.Services
                     DriverId = c.DriverId,
                     DriverName = c.Driver != null ? c.Driver.DriverName : string.Empty,
                     CarId = c.CarId,
-                    CarName = c.Car != null ? c.Car.Brand : string.Empty,
+                    //CarName = c.Car != null ? c.Car.Brand : string.Empty,
+                    //                CarName = c.Car != null
+                    //? (!string.IsNullOrEmpty(c.Car.Brand)
+                    //    ? c.Car.Brand
+                    //    : (!string.IsNullOrEmpty(c.Car.NumberPlate)
+                    //        ? c.Car.NumberPlate
+                    //        : string.Empty))
+                    //: string.Empty,
+                    CarName = c.Car != null
+                  ? $"{c.Car.NumberPlate ?? ""} — {c.Car.Brand ?? ""} {c.Car.Model ?? ""}".Trim()
+                  : string.Empty,
+
+
                     StartDate = c.StartDate,
                     EndDate = c.EndDate,
                     Status = c.Status,               // ContractStatus
@@ -340,6 +353,9 @@ namespace CapManagement.Server.Services
                 DriverId = contract.DriverId,
                 DriverName = contract.Driver != null ? contract.Driver.DriverName : string.Empty,
                 CarId = contract.CarId,
+                CarName = contract.Car != null
+                  ? $"{contract.Car.NumberPlate ?? ""} — {contract.Car.Brand ?? ""} {contract.Car.Model ?? ""}".Trim()
+                  : string.Empty,
                 StartDate = contract.StartDate,
                 EndDate = contract.EndDate,
                 Status = contract.Status,               // ContractStatus
@@ -636,7 +652,7 @@ namespace CapManagement.Server.Services
                 CarId = dto.CarId,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
-                Status = dto.Status,
+                Status = ContractStatus.Active,
                 PaymentAmount = dto.PaymentAmount,
                 Description = dto.Description ?? string.Empty,
                 Conditions = dto.Conditions ?? string.Empty,

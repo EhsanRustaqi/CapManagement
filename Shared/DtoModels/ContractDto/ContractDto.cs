@@ -29,6 +29,8 @@ namespace CapManagement.Shared.DtoModels.ContractDto
         [JsonPropertyName("carName")]
         public string? CarName { get; set; }
 
+
+
         [JsonPropertyName("startDate")]
         public DateTime StartDate { get; set; }
 

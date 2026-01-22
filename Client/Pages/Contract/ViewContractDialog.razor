@@ -40,14 +40,38 @@ else
                 <!-- Car Selection (Dropdown) -->
                 <RadzenFormField Text="Car" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenDropDown @bind-Value="Contract.CarId"
+                        @* <RadzenDropDown @bind-Value="Contract.CarId"
                                         Data="@Cars"
                                         TextProperty="Brand"
                                         ValueProperty="CarId"
                                         Name="CarId"
                                         Style="width:100%"
                                         Placeholder="Select a car" />
-                        <RadzenRequiredValidator Component="CarId" Text="Car is required" />
+                        <RadzenRequiredValidator Component="CarId" Text="Car is required" /> *@
+                        <RadzenDropDown @bind-Value="Contract.CarId"
+                                        Data="@Cars"
+                                        ValueProperty="CarId"
+                                        Placeholder="Select available car"
+                                        Style="width:100%"
+                                        AllowFiltering="true"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
+
+                            <!-- How each item in the list looks -->
+                            <Template Context="car">
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span><b>@car.NumberPlate</b></span>
+                                    <span style="color:#666;">@car.Brand @car.Model</span>
+                                </div>
+                            </Template>
+
+                            <!-- How the selected value looks in the closed dropdown -->
+                            <ValueTemplate Context="car">
+                                <span>
+                                    <b>@car.NumberPlate</b> — @car.Brand @car.Model
+                                </span>
+                            </ValueTemplate>
+
+                        </RadzenDropDown>
                     </ChildContent>
                 </RadzenFormField>
 
