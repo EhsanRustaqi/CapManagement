@@ -89,7 +89,7 @@ namespace CapManagement.Server.Controllers
             {
                 if (contractId == Guid.Empty || companyId == Guid.Empty)
                 {
-                    
+
                     return BadRequest(new ApiResponse<byte[]>
                     {
                         Success = false,
@@ -100,7 +100,7 @@ namespace CapManagement.Server.Controllers
                 var response = await _contractService.GetContractPdfAsync(contractId, companyId);
                 if (!response.Success)
                 {
-                   
+
                     return BadRequest(response);
                 }
 
@@ -109,7 +109,7 @@ namespace CapManagement.Server.Controllers
             }
             catch (Exception ex)
             {
-              
+
                 return StatusCode(500, new ApiResponse<byte[]>
                 {
                     Success = false,
@@ -174,7 +174,22 @@ namespace CapManagement.Server.Controllers
 
             return Ok(new { Message = "contract archived successfully." });
         }
+        // inactive contract list
+        [HttpGet("history")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<ContractDto>>>> GetInactiveContractsAsync(
+     [FromQuery] int pageNumber = 1,
+     [FromQuery] int pageSize = 10,
+     [FromQuery] Guid companyId = default,
+     [FromQuery] string? orderBy = null,
+     [FromQuery] string? filter = null)
+        {
+            var response = await _contractService.GetAllInActiveContractAsync(pageNumber, pageSize, companyId, orderBy, filter);
 
+            if (!response.Success)
+                return BadRequest(response);
+
+            return Ok(response);
+        }
 
 
 
@@ -206,7 +221,7 @@ namespace CapManagement.Server.Controllers
 
         // ✅ Get archived contracts (paged)
         [HttpGet("archived")]
-        public async Task <ActionResult<ApiResponse<PagedResponse<ContractDto>>>>
+        public async Task<ActionResult<ApiResponse<PagedResponse<ContractDto>>>>
             GetArchivedContractsAsync(
                 int pageNumber = 1,
                 int pageSize = 10,
@@ -229,5 +244,15 @@ namespace CapManagement.Server.Controllers
         }
 
 
+
+
+    
+
+
     }
+
+
+
+
+
 }

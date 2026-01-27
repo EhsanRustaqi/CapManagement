@@ -1,0 +1,285 @@
+﻿@page "/GetInActiveContract"
+@inject IContractServiceClient ContractClientService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@using CapManagement.Client.IServiceClient
+@using CapManagement.Shared.DtoModels.ContractDto
+@using CapManagement.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+
+
+
+
+
+
+<RadzenDataGrid @ref="ContractsGrid"
+                Data="@Contracts"
+                Count="@totalCount"
+                LoadData="@LoadData"
+                TItem="ContractDto"
+                AllowPaging="true"
+                PagerHorizontalAlign="HorizontalAlign.Center"
+                AllowSorting="true"
+                AllowMultiColumnSorting="true"
+                AllowFiltering="true"
+                FilterMode="FilterMode.Advanced"
+                PageSize="10">
+    <Columns>
+        <RadzenDataGridColumn Width="50px" Title="#" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+            <Template Context="data">
+                @(Contracts.IndexOf(data) + ((pageNumber - 1) * pageSize) + 1)
+            </Template>
+        </RadzenDataGridColumn>
+
+        @*  <RadzenDataGridColumn Property="ContractId" Title="Contract ID" />
+        <RadzenDataGridColumn Property="CompanyId" Title="Company ID" /> *@
+        <RadzenDataGridColumn Property="DriverName" Title="Driver ID" />
+        <RadzenDataGridColumn Property="CarName" Title=" CarName" />
+
+        <RadzenDataGridColumn Property="StartDate" Title="Start Date" FormatString="{0:yyyy-MM-dd}" />
+        <RadzenDataGridColumn Property="EndDate" Title="End Date" FormatString="{0:yyyy-MM-dd}" />
+        <RadzenDataGridColumn Property="Status" Title="Status" />
+        <RadzenDataGridColumn Property="PaymentAmount" Title="Payment" />
+        <RadzenDataGridColumn Property="Description" Title="Description" />
+        <RadzenDataGridColumn Property="Conditions" Title="Conditions" />
+
+        <RadzenDataGridColumn Width="160px" Title="Actions" Filterable="false" Sortable="false">
+            <Template Context="data">
+                <RadzenButton Text="PDF"
+                              Click="@(async () => await DownloadPdfAsync(data.ContractId))"
+                              Size="ButtonSize.Small" />
+
+                <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                              Click="@(args => DialogService.OpenAsync<ViewContractDialog>(
+          "Contract Details",
+          new Dictionary<string, object>() { { "ContractId", data.ContractId } },
+          new DialogOptions() { Width = "600px", Height = "500px" }))" />
+
+
+
+
+                <RadzenButton Icon="archive"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@(() => ConfirmArchive(data.ContractId, data.CompanyId))" />
+
+
+            </Template>
+
+
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private RadzenDataGrid<ContractDto>? ContractsGrid;
+    private List<ContractDto> Contracts = new();
+    private int totalCount;
+    private int pageNumber = 1;
+    private int pageSize = 5;
+    private bool isLoading;
+    private bool isDisposed;
+    private Guid companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (isDisposed) return;
+        await LoadData(new LoadDataArgs { Skip = 0, Top = pageSize });
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        if (isDisposed || isLoading) return;
+        isLoading = true;
+        try
+        {
+            if (args.Skip.HasValue && args.Top.HasValue && args.Top.Value > 0)
+            {
+                pageNumber = (args.Skip.Value / args.Top.Value) + 1;
+                pageSize = args.Top.Value;
+            }
+
+            var result = await ContractClientService.GetInActiveContractAsync(companyId, pageNumber, pageSize, args.OrderBy, args.Filter);
+            if (result != null && result.Success)
+            {
+                Contracts = result.Data?.Data ?? new List<ContractDto>();
+                totalCount = result.Data?.TotalItems ?? 0;
+                if (!isDisposed && ContractsGrid != null)
+                {
+                    await ContractsGrid.Reload();
+                }
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Loading Contracts",
+                        Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+                        Duration = 4000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Exception",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+
+
+
+    private async Task ConfirmArchive(Guid contractId, Guid companyId)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to archive contract {contractId}?",
+            "Confirm Archive",
+            new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" }
+        );
+
+        if (confirmed == true)
+        {
+            var result = await ContractClientService.ArchiveContractAsync(contractId, companyId);
+            if (result != null && result.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Contract Archived",
+                        Detail = $"Contract {contractId} archived successfully.",
+                        Duration = 4000
+                    });
+
+                await LoadData(new LoadDataArgs { Skip = (pageNumber - 1) * pageSize, Top = pageSize });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error Archiving Contract",
+                        Detail = string.Join("; ", result?.Errors ?? new List<string> { "Unknown error" }),
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+
+
+
+
+    private async Task EditContract(Guid ContractId)
+    {
+        var Contract = await ContractClientService.GetContractByIdAsync(ContractId, companyId);
+        if (Contract == null || !Contract.Success)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = Contract?.Errors?.Any() == true ? string.Join("; ", Contract.Errors) : "Car not found.",
+                    Duration = 4000
+                });
+            return;
+        }
+
+        var parameters = new Dictionary<string, object>
+        {
+            { "Contract", Contract.Data },
+            { "OnSave", new Action<UpdateContractDto>(async (updateContract) =>
+                {
+                    var result = await ContractClientService.UpdateContractAsync(updateContract);
+                    if (result.Success)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Success,
+                            Summary = "Car Updated",
+                            Detail = $"Car '' updated successfully.",
+                            Duration = 4000
+                        });
+                        await LoadData(new LoadDataArgs { Skip = (pageNumber - 1) * pageSize, Top = pageSize });
+                    }
+                    else
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Error,
+                            Summary = "Error Updating Contract",
+                            Detail = string.Join("; ", result.Errors),
+                            Duration = 4000
+                        });
+                    }
+                })
+            }
+        };
+
+        // await DialogService.OpenAsync<EditCarDialog>("Edit Car", parameters, new DialogOptions { Width = "500px", Height = "auto" });
+    }
+
+
+
+
+
+
+
+
+    private async Task DownloadPdfAsync(Guid contractId)
+    {
+
+        var companyId = Guid.Parse("9D176E43-E0FF-4755-B130-625189F3991B");
+        var result = await ContractClientService.GetContractPdfAsync(contractId, companyId);
+        if (result.Success && result.Data != null)
+        {
+            var base64Pdf = Convert.ToBase64String(result.Data);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Contract_{contractId}.pdf", base64Pdf);
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Download Failed",
+                    Detail = string.Join("; ", result.Errors ?? new List<string> { "Unknown error" }),
+                    Duration = 4000
+                });
+        }
+    }
+
+
+    public void Dispose()
+    {
+        isDisposed = true;
+    }
+
+
+
+
+  
+
+
+
+
+  
+
+    }
+
+
+
+}

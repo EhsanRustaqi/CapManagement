@@ -411,6 +411,71 @@ namespace CapManagement.Client.ServiceClient
 
 
 
+        public async Task<ApiResponse<PagedResponse<ContractDto>>> GetInActiveContractAsync(Guid companyId, int pageNumber = 1, int pageSize = 10, string? orderBy = null, string? filter = null)
+        {
+            if (companyId == Guid.Empty)
+            {
+                return new ApiResponse<PagedResponse<ContractDto>>
+                {
+                    Success = false,
+                    Errors = new List<string> { "Invalid company ID" }
+                };
+            }
+
+            // Build query string
+            var queryString = $"?companyId={companyId}&pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrEmpty(orderBy))
+            {
+                queryString += $"&orderBy={Uri.EscapeDataString(orderBy)}";
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                queryString += $"&filter={Uri.EscapeDataString(filter)}";
+            }
+
+            try
+            {
+                // Log for debugging
+                Console.WriteLine($"ClientService - Calling API: api/Car{queryString}");
+
+                var response = await _httpClient.GetAsync($"api/Contract/history{queryString}");
+                if (response.IsSuccessStatusCode)
+                { 
+                    var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResponse<ContractDto>>>();
+
+                    if (result != null)
+                        return result;
+
+                    return new ApiResponse<PagedResponse<ContractDto>>
+                    {
+                        Success = false,
+                        Errors = new List<string> { "Failed to deserialize response" }
+                    };
+                }
+
+                return new ApiResponse<PagedResponse<ContractDto>>
+                {
+                    Success = false,
+                    Errors = new List<string> { $"HTTP error: {response.StatusCode}" }
+                };
+            }
+            catch (Exception ex)
+            {
+                // Log for debugging
+                Console.WriteLine($"ClientService error: {ex.Message}");
+                return new ApiResponse<PagedResponse<ContractDto>>
+                {
+                    Success = false,
+                    Errors = new List<string> { $"Client error: {ex.Message}" }
+                };
+            }
+        }
+
+
+
+
+
+
         public Task<ApiResponse<bool>> RestoreContractAsync(Guid contractId, Guid companyId)
         {
             throw new NotImplementedException();

@@ -8,6 +8,8 @@ namespace CapManagement.Server.IRepository
         Task<PageResult<Contract>> GetAllContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter);
 
 
+        Task<PageResult<Contract>> GetAllInActiveContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter);
+
         Task<PageResult<Contract>> GetArchivedContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter);
 
 

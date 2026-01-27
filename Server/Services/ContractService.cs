@@ -703,6 +703,52 @@ namespace CapManagement.Server.Services
                 Message = "Contract expired successfully."
             };
         }
+
+        public async Task<ApiResponse<PagedResponse<ContractDto>>> GetAllInActiveContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter)
+        {
+            var response = new ApiResponse<PagedResponse<ContractDto>>();
+
+            var pagedResult = await _contractRepository.GetAllInActiveContractAsync(pageNumber, pageSize, companyId, orderBy, filter);
+
+            var pagedResponse = new PagedResponse<ContractDto>
+            {
+                Data = pagedResult.Items.Select(c => new ContractDto
+                {
+                    ContractId = c.ContractId,
+                    CompanyId = c.CompanyId,
+                    DriverId = c.DriverId,
+                    DriverName = c.Driver != null ? c.Driver.DriverName : string.Empty,
+                    CarId = c.CarId,
+                    //CarName = c.Car != null ? c.Car.Brand : string.Empty,
+                    //                CarName = c.Car != null
+                    //? (!string.IsNullOrEmpty(c.Car.Brand)
+                    //    ? c.Car.Brand
+                    //    : (!string.IsNullOrEmpty(c.Car.NumberPlate)
+                    //        ? c.Car.NumberPlate
+                    //        : string.Empty))
+                    //: string.Empty,
+                    CarName = c.Car != null
+                  ? $"{c.Car.NumberPlate ?? ""} — {c.Car.Brand ?? ""} {c.Car.Model ?? ""}".Trim()
+                  : string.Empty,
+
+
+                    StartDate = c.StartDate,
+                    EndDate = c.EndDate,
+                    Status = c.Status,               // ContractStatus
+                    PaymentAmount = c.PaymentAmount,
+                    Description = c.Description,
+                    Conditions = c.Conditions
+                }).ToList(),
+                PageNumber = pagedResult.PageNumber,
+                PageSize = pagedResult.PageSize,
+                TotalPages = (int)Math.Ceiling(pagedResult.TotalCount / (double)pagedResult.PageSize),
+                TotalItems = pagedResult.TotalCount
+            };
+
+            response.Success = true;
+            response.Data = pagedResponse;
+            return response;
+        }
     }
 
 }

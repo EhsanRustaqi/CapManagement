@@ -14,6 +14,10 @@ namespace CapManagement.Client.IServiceClient
 
         Task<ApiResponse<PagedResponse<ContractDto>>> GetContractAsync(Guid companyId, int pageNumber = 1, int pageSize = 10, string? orderBy = null, string? filter = null);
 
+
+
+        Task<ApiResponse<PagedResponse<ContractDto>>> GetInActiveContractAsync(Guid companyId, int pageNumber = 1, int pageSize = 10, string? orderBy = null, string? filter = null);
+
         Task<ApiResponse<byte[]>> GetContractPdfAsync(Guid contractId, Guid companyId);
 
 

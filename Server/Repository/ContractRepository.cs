@@ -166,10 +166,87 @@ namespace CapManagement.Server.Repository
             };
         }
 
+        public async Task<PageResult<Contract>> GetAllInActiveContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter)
+        {
+
+            if (companyId == Guid.Empty)
+            {
+                throw new ArgumentException("Company ID cannot be empty.", nameof(companyId));
+            }
+
+            pageNumber = Math.Max(1, pageNumber);
+            pageSize = Math.Max(1, Math.Min(pageSize, 100));
+
+            var query = _context.Contracts
+                  .Where(c => c.CompanyId == companyId && c.IsActive && c.Status != ContractStatus.Active)
+                  .Include(c => c.Driver)
+                  .Include(c => c.Car)
+                  .AsNoTracking();
 
 
 
+            // ✅ Properly structured: Include Car/ Driver if needed for filter or orderBy
+            if (!string.IsNullOrEmpty(filter) && (filter.Contains("Car.") || filter.Contains("Driver.")))
+                    {
+                        query = query.Include(c => c.Car).Include(c => c.Driver);
+                    }
+                    else if (!string.IsNullOrEmpty(orderBy) && (orderBy.Contains("Car.") || orderBy.Contains("Driver.")))
+                    {
+                        query = query.Include(c => c.Car).Include(c => c.Driver);
+                    }
 
+            // Apply filtering (exclude PdfContent)
+            if (!string.IsNullOrEmpty(filter) && !filter.Contains("PdfContent"))
+            {
+                try
+                {
+                    query = query.Where(filter); // requires System.Linq.Dynamic.Core
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Filter error: {ex.Message}");
+                    return new PageResult<Contract>
+                    {
+                        Items = new List<Contract>(),
+                        TotalCount = 0,
+                        PageNumber = pageNumber,
+                        PageSize = pageSize
+                    };
+                }
+            }
+
+            // Apply sorting (exclude PdfContent)
+            if (!string.IsNullOrEmpty(orderBy) && !orderBy.Contains("PdfContent"))
+            {
+                try
+                {
+                    query = query.OrderBy(orderBy); // requires System.Linq.Dynamic.Core
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Sort error: {ex.Message}");
+                    query = query.OrderBy(c => c.ContractId);
+                }
+            }
+            else
+            {
+                query = query.OrderBy(c => c.ContractId);
+            }
+
+            var totalCount = await query.CountAsync();
+            var contracts = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PageResult<Contract>
+            {
+                Items = contracts,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
 
         public async Task<PageResult<Contract>> GetArchivedContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter)
         {

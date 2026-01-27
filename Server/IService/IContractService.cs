@@ -9,6 +9,10 @@ namespace CapManagement.Server.IService
     {
         Task<ApiResponse<PagedResponse<ContractDto>>> GetAllContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter);
 
+
+        Task<ApiResponse<PagedResponse<ContractDto>>> GetAllInActiveContractAsync(int pageNumber, int pageSize, Guid companyId, string? orderBy, string? filter);
+
+
         Task<ApiResponse<ContractDto>> CreateContractAsync(CreateContractDto contractDto, string userId);
 
         Task<ApiResponse<byte[]>> GetContractPdfAsync(Guid contractId, Guid companyId);
